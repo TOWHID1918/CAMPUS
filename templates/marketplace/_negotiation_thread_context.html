@@ -1,0 +1,28 @@
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card__header">
+    <div>
+      <p class="card__title">Marketplace Negotiation</p>
+      <div class="card__meta">
+        <span class="badge badge--active">{{ ctx.listing.status }}</span>
+        <span>Listing #{{ ctx.listing.pk }}</span>
+        <span>Buyer: {{ ctx.buyer.get_full_name|default:ctx.buyer.email }}</span>
+      </div>
+    </div>
+    <a href="{% url 'marketplace:listing_detail' listing_id=ctx.listing.id %}"
+       class="btn btn--outline btn--sm">
+      View Listing
+    </a>
+  </div>
+
+  <div class="card__body">
+    <p>
+      This thread is a price negotiation for
+      <strong>{{ ctx.listing.title }}</strong>
+      listed at <strong style="color: var(--orange);">৳{{ ctx.listing.price }}</strong>
+      by
+      <a href="{% url 'accounts:profile' ctx.listing.seller.handle %}">
+        @{{ ctx.listing.seller.handle }}
+      </a>.
+    </p>
+  </div>
+</div>

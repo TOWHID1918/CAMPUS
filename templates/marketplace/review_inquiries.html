@@ -1,0 +1,78 @@
+{% extends "marketplace/base.html" %}
+{% load static %}
+
+{% block title %}Review Inquiries{% endblock %}
+
+{% block content %}
+
+<div class="campus-header">
+  <div class="campus-header__row">
+    <div>
+      <h1>Review Inquiries</h1>
+      <p>{{ listing.title }}</p>
+    </div>
+
+    <a href="{% url 'marketplace:listing_detail' listing.id %}"
+       class="btn btn--ghost btn--sm">
+      Back to Listing
+    </a>
+  </div>
+</div>
+
+{% if inquiries %}
+
+  <div class="post-grid">
+
+    {% for inquiry in inquiries %}
+
+      <div class="post-card">
+
+        <div class="post-card__body">
+
+          <div class="post-card__title">
+            @{{ inquiry.buyer.handle }}
+          </div>
+
+          <div class="post-card__meta">
+
+            
+
+            <div class="post-card__meta-item">
+              Started:
+              {{ inquiry.created_at|date:"M j, Y" }}
+            </div>
+
+          </div>
+
+          <div class="post-card__footer"
+               style="margin-top: 16px;">
+
+        
+            <a href="{% url 'marketplace:open_negotiation' negotiation_id=inquiry.id %}"
+               class="btn btn--primary btn--sm"
+               style="width: 100%; justify-content: center;">
+
+              Open Conversation
+
+            </a>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    {% endfor %}
+
+  </div>
+
+{% else %}
+
+  <div class="empty">
+    <strong>No inquiries yet.</strong>
+    <p>Buyers who contact you will appear here.</p>
+  </div>
+
+{% endif %}
+
+{% endblock %}

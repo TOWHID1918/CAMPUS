@@ -119,6 +119,12 @@ class ProfileStatus(models.TextChoices):
     FLAGGED = "flagged", "Flagged"
     SUSPENDED = "suspended", "Suspended"
 
+# marketplace listiong status
+class ListingStatus(models.TextChoices):
+    ACTIVE    = "ACTIVE",    "Active"
+    SOLD      = "SOLD",      "Sold"
+    ARCHIVED  = "ARCHIVED",  "Archived"
+
 # Ride Sharing domain status and choices
 class TransportMethod(models.TextChoices):
     CAR = "car", "Car"

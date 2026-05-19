@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'marketplace/css/marketplace.css' %}">
+{% endblock %}
+
+{% block subnav %}
+<div class="campus-subnav">
+  <div class="campus-subnav__inner">
+    <a href="{% url 'marketplace:listing_list' %}"
+       class="{% if request.resolver_match.url_name == 'listing_list' %}active{% endif %}">
+      Listings
+    </a>
+    <a href="{% url 'marketplace:my_listings' %}"
+       class="{% if request.resolver_match.url_name == 'my_listings' %}active{% endif %}">
+      My Listings
+    </a>
+    <a href="{% url 'marketplace:negotiations_buyer' %}"
+       class="{% if request.resolver_match.url_name == 'negotiations_buyer' %}active{% endif %}">
+      Buying
+    </a>
+    <div class="subnav-divider"></div>
+    <a href="{% url 'marketplace:create_listing' %}"
+       class="{% if request.resolver_match.url_name == 'create_listing' %}active{% endif %}">
+      + New Listing
+    </a>
+  </div>
+</div>
+{% endblock %}

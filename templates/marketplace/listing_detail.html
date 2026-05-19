@@ -1,0 +1,256 @@
+{% extends "marketplace/base.html" %}
+{% load static %}
+
+{% block title %}{{ listing.title }} — Marketplace{% endblock %}
+
+{% block content %}
+
+<div class="campus-header">
+  <div class="campus-header__row">
+
+    <div>
+      {% if listing.category %}
+        <span class="badge badge--active"
+              style="
+                background: var(--orange);
+                color: #fff;
+                border: none;
+                margin-bottom: 8px;
+                display: inline-block;
+              ">
+          {{ listing.category.name }}
+        </span>
+      {% endif %}
+
+      <h1>{{ listing.title }}</h1>
+    </div>
+
+    {% if user == listing.seller %}
+
+      <a href="{% url 'marketplace:edit_listing' listing.id %}"
+         class="btn btn--outline btn--sm">
+        Edit Listing
+      </a>
+
+    {% elif user.is_authenticated and listing.status == "ACTIVE" %}
+
+      {% if negotiation %}
+
+        {% if negotiation.status == "PENDING" %}
+
+          <button class="btn btn--outline btn--sm" disabled>
+            Request Pending
+          </button>
+
+        {% elif negotiation.status == "ACCEPTED" %}
+
+          <a href="{% url 'threads:thread_detail' negotiation.thread.id %}"
+             class="btn btn--primary btn--sm">
+            Open Chat
+          </a>
+
+        {% elif negotiation.status == "REJECTED" %}
+
+          <button class="btn btn--outline btn--sm" disabled>
+            Request Rejected
+          </button>
+
+        {% endif %}
+
+      {% else %}
+
+        <a href="{% url 'marketplace:request_chat' listing.id %}"
+           class="btn btn--primary btn--sm">
+          Request Chat
+        </a>
+
+      {% endif %}
+
+    {% endif %}
+
+  </div>
+</div>
+
+{% if user == listing.seller %}
+
+  {% with listing.negotiation_threads.all as inquiries %}
+
+    {% if inquiries %}
+
+      <div style="
+        margin-bottom: 20px;
+        padding: 14px 18px;
+        background: var(--orange-light);
+        border: 1px solid var(--orange-border);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      ">
+
+        <span style="font-size: 14px; color: var(--text);">
+          You have
+          <strong>{{ inquiries.count }}</strong>
+          chat request{{ inquiries.count|pluralize }}.
+        </span>
+
+        <a href="{% url 'marketplace:review_inquiries' listing.id %}"
+           class="btn btn--primary btn--sm">
+          Review Requests
+        </a>
+
+      </div>
+
+    {% endif %}
+
+  {% endwith %}
+
+{% endif %}
+
+<div class="detail-grid">
+
+  <div>
+
+    {% if listing.description %}
+      <div class="section">
+        <p class="section__label">Description</p>
+
+        <p style="
+          font-size: 15px;
+          line-height: 1.65;
+          white-space: pre-wrap;
+        ">
+          {{ listing.description }}
+        </p>
+      </div>
+    {% endif %}
+
+    {% with listing.photos.all as photos %}
+
+      {% if photos %}
+
+        <div class="section">
+
+          <p class="section__label">Photos</p>
+
+          <div class="photo-grid">
+
+            {% for lp in photos %}
+
+              <a href="{{ lp.photo.file.url }}" target="_blank">
+
+                <img src="{{ lp.photo.file.url }}"
+                     alt="{{ listing.title }}" />
+
+              </a>
+
+            {% endfor %}
+
+          </div>
+
+        </div>
+
+      {% endif %}
+
+    {% endwith %}
+
+  </div>
+
+  <div>
+
+    <div class="card">
+
+      <p class="section__label" style="margin-bottom: 0;">
+        Details
+      </p>
+
+      <dl class="detail-meta-list">
+
+        <div class="detail-meta-row">
+          <dt>Price</dt>
+
+          <dd style="
+            font-weight: 600;
+            color: var(--orange);
+          ">
+            ৳{{ listing.price }}
+          </dd>
+        </div>
+
+        <div class="detail-meta-row">
+          <dt>Status</dt>
+
+          <dd>
+
+            {% if listing.status == "ACTIVE" %}
+
+              <span class="badge badge--active">
+                Active
+              </span>
+
+            {% elif listing.status == "SOLD" %}
+
+              <span class="badge badge--pending">
+                Sold
+              </span>
+
+            {% else %}
+
+              <span class="badge">
+                {{ listing.status }}
+              </span>
+
+            {% endif %}
+
+          </dd>
+        </div>
+
+        <div class="detail-meta-row">
+          <dt>Category</dt>
+
+          <dd>
+            {% if listing.category %}
+              {{ listing.category.name }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+        </div>
+
+        <div class="detail-meta-row">
+          <dt>Posted by</dt>
+
+          <dd>
+            <a href="{% url 'accounts:profile' listing.seller.handle %}">
+              {{ listing.seller.handle }}
+            </a>
+          </dd>
+        </div>
+
+        <div class="detail-meta-row">
+          <dt>Posted on</dt>
+
+          <dd>
+            {{ listing.created_at|date:"M d, Y" }}
+          </dd>
+        </div>
+
+      </dl>
+
+    </div>
+
+    <a href="{% url 'marketplace:listing_list' %}"
+       class="btn btn--ghost btn--sm"
+       style="
+         margin-top: 12px;
+         width: 100%;
+         justify-content: center;
+       ">
+      ← Back to Listings
+    </a>
+
+  </div>
+
+</div>
+
+{% endblock %}

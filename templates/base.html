@@ -59,7 +59,7 @@
           </a>
         </li>
         <li>
-          <a href="#"
+          <a href="{% url 'marketplace:listing_list' %}"
              {% if request.resolver_match.app_name == 'marketplace' %}class="active"{% endif %}>
             Marketplace
           </a>
