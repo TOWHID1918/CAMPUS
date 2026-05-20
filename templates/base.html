@@ -24,7 +24,7 @@
 <body>
 
   {# ── Global navigation ────────────────────────────────────── #}
-  <nav class="campus-nav">
+  <nav class="campus-nav" id="campus-nav">
     <div class="campus-nav__inner">
 
       {# Brand #}
@@ -33,7 +33,7 @@
       </a>
 
       {# Five platform features #}
-      <ul class="campus-nav__links" style="flex: 1; justify-content: center;">
+      <ul class="campus-nav__links">
         <li>
           <a href="{% url 'skill_exchange:post_list' %}"
              {% if request.resolver_match.app_name == 'skill_exchange' %}class="active"{% endif %}>
@@ -67,7 +67,7 @@
       </ul>
 
       {# Right: dark mode toggle, notifications, auth #}
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="nav-icons">
         <button
           class="theme-toggle"
           id="theme-toggle"
@@ -112,19 +112,26 @@
             </div>
           </div>
         {% endif %}
+        {# ── Hamburger button (mobile only) ───────────────────────── #}
+        <button class="hamburger" id="hamburger-btn" aria-label="Open menu" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="15" height="15" fill="currentColor">
+        <path d="M96 160C96 142.3 110.3 128 128 128L512 128C529.7 128 544 142.3 544 160C544 177.7 529.7 192 512 192L128 192C110.3 192 96 177.7 96 160zM96 320C96 302.3 110.3 288 128 288L512 288C529.7 288 544 302.3 544 320C544 337.7 529.7 352 512 352L128 352C110.3 352 96 337.7 96 320zM544 480C544 497.7 529.7 512 512 512L128 512C110.3 512 96 497.7 96 480C96 462.3 110.3 448 128 448L512 448C529.7 448 544 462.3 544 480z"/>
+        </svg>
+        </button>
 
-        <div class="nav-user">
-          {% if user.is_authenticated %}
-            <a href="{% url 'accounts:myself' %}">@{{ user.handle|truncatechars:18 }}</a>
-            <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
-              {% csrf_token %}
-              <button type="submit" class="nav-logout-btn">Log out</button>
-            </form>
-          {% else %}
-            <a href="{% url 'accounts:login' %}">Log in</a>
-            <a href="{% url 'accounts:register' %}">Sign up</a>
-          {% endif %}
-        </div>
+      </div>
+
+      <div class="nav-user">
+        {% if user.is_authenticated %}
+          <a href="{% url 'accounts:myself' %}">@{{ user.handle|truncatechars:18 }}</a>
+          <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn">Log out</button>
+          </form>
+        {% else %}
+          <a href="{% url 'accounts:login' %}">Log in</a>
+          <a href="{% url 'accounts:register' %}">Sign up</a>
+        {% endif %}
       </div>
 
     </div>
