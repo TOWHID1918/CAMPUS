@@ -68,21 +68,6 @@
         </select>
       </div>
 
-      {% if listing %}
-        <div class="form-group">
-          <label for="status">Status</label>
-          <select id="status" name="status" style="
-            width: 100%; padding: 8px 12px;
-            border-radius: var(--radius); border: 1.5px solid var(--border-dark);
-            background: var(--surface); color: var(--text);
-            font-size: 14px; font-family: inherit; cursor: pointer;">
-            <option value="ACTIVE"   {% if listing.status == "ACTIVE"   %}selected{% endif %}>Active</option>
-            <option value="SOLD"     {% if listing.status == "SOLD"     %}selected{% endif %}>Sold</option>
-            <option value="ARCHIVED" {% if listing.status == "ARCHIVED" %}selected{% endif %}>Archived</option>
-          </select>
-        </div>
-      {% endif %}
-
       <div class="form-group">
         <label for="photos">
           Photos

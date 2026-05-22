@@ -25,31 +25,31 @@
       <h1>{{ listing.title }}</h1>
     </div>
 
-    {% if user == listing.seller %}
-
+    {% if user == listing.seller and listing.status != "sold" %}
       <a href="{% url 'marketplace:edit_listing' listing.id %}"
          class="btn btn--outline btn--sm">
         Edit Listing
       </a>
+    {% endif %}
 
-    {% elif user.is_authenticated and listing.status == "ACTIVE" %}
+    {% if user.is_authenticated and user != listing.seller and listing.status == "active" %}
 
       {% if negotiation %}
 
-        {% if negotiation.status == "PENDING" %}
+        {% if negotiation.status == "pending" %}
 
           <button class="btn btn--outline btn--sm" disabled>
             Request Pending
           </button>
 
-        {% elif negotiation.status == "ACCEPTED" %}
+        {% elif negotiation.status == "accepted" %}
 
           <a href="{% url 'threads:thread_detail' negotiation.thread.id %}"
              class="btn btn--primary btn--sm">
             Open Chat
           </a>
 
-        {% elif negotiation.status == "REJECTED" %}
+        {% elif negotiation.status == "rejected" %}
 
           <button class="btn btn--outline btn--sm" disabled>
             Request Rejected
@@ -182,13 +182,13 @@
 
           <dd>
 
-            {% if listing.status == "ACTIVE" %}
+            {% if listing.status == "active" %}
 
               <span class="badge badge--active">
                 Active
               </span>
 
-            {% elif listing.status == "SOLD" %}
+            {% elif listing.status == "sold" %}
 
               <span class="badge badge--pending">
                 Sold

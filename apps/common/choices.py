@@ -119,11 +119,25 @@ class ProfileStatus(models.TextChoices):
     FLAGGED = "flagged", "Flagged"
     SUSPENDED = "suspended", "Suspended"
 
-# marketplace listiong status
+
+# Marketplace listing status
 class ListingStatus(models.TextChoices):
-    ACTIVE    = "ACTIVE",    "Active"
-    SOLD      = "SOLD",      "Sold"
-    ARCHIVED  = "ARCHIVED",  "Archived"
+    ACTIVE = "active", "Active"
+    SOLD = "sold", "Sold"
+    ARCHIVED = "archived", "Archived"
+
+
+class PurchaseRequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
+class NegotiationStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    ACCEPTED = "accepted", "Accepted"
+    REJECTED = "rejected", "Rejected"
+
 
 # Ride Sharing domain status and choices
 class TransportMethod(models.TextChoices):
@@ -132,11 +146,13 @@ class TransportMethod(models.TextChoices):
     CNG = "cng", "CNG"
     MICROBUS = "microbus", "MICROBUS"
 
+
 TRANSPORT_CAPACITY = {
     TransportMethod.RICKSHAW: 2,
-    TransportMethod.CNG:      3,
-    TransportMethod.CAR:      4,
+    TransportMethod.CNG: 3,
+    TransportMethod.CAR: 4,
 }
+
 
 class RidePostStatus(models.TextChoices):
     OPEN = "open", "Open"

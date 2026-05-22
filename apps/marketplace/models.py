@@ -1,25 +1,11 @@
 from django.db import models
 from django.conf import settings
-
-
-class ListingStatus(models.TextChoices):
-    ACTIVE = "ACTIVE", "Active"
-    SOLD = "SOLD", "Sold"
-    ARCHIVED = "ARCHIVED", "Archived"
-
-
-class PurchaseRequestStatus(models.TextChoices):
-    PENDING = "PENDING", "Pending"
-    APPROVED = "APPROVED", "Approved"
-    REJECTED = "REJECTED", "Rejected"
+from apps.common.choices import PurchaseRequestStatus, ListingStatus, NegotiationStatus
 
 
 class Category(models.Model):
 
-    name = models.CharField(
-        max_length=100,
-        unique=True
-    )
+    name = models.CharField(max_length=100, unique=True)
 
     class Meta:
         verbose_name_plural = "Categories"
@@ -37,18 +23,11 @@ class Listing(models.Model):
         related_name="listings",
     )
 
-    title = models.CharField(
-        max_length=255
-    )
+    title = models.CharField(max_length=255)
 
-    description = models.TextField(
-        blank=True
-    )
+    description = models.TextField(blank=True)
 
-    price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
-    )
+    price = models.DecimalField(max_digits=10, decimal_places=2)
 
     category = models.ForeignKey(
         Category,
@@ -64,13 +43,9 @@ class Listing(models.Model):
         default=ListingStatus.ACTIVE,
     )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    updated_at = models.DateTimeField(
-        auto_now=True
-    )
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.title} by {self.seller.email}"
@@ -79,53 +54,34 @@ class Listing(models.Model):
 class ListingPhoto(models.Model):
 
     listing = models.ForeignKey(
-        Listing,
-        on_delete=models.CASCADE,
-        related_name="photos"
+        Listing, on_delete=models.CASCADE, related_name="photos"
     )
 
     photo = models.ForeignKey(
-        "media.Photo",
-        on_delete=models.CASCADE,
-        related_name="listing_photos"
+        "media.Photo", on_delete=models.CASCADE, related_name="listing_photos"
     )
 
-    order = models.PositiveIntegerField(
-        default=0
-    )
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["order"]
 
 
 class NegotiationThread(models.Model):
-
-    STATUS_PENDING = "PENDING"
-    STATUS_ACCEPTED = "ACCEPTED"
-    STATUS_REJECTED = "REJECTED"
-
-    STATUS_CHOICES = [
-        (STATUS_PENDING, "Pending"),
-        (STATUS_ACCEPTED, "Accepted"),
-        (STATUS_REJECTED, "Rejected"),
-    ]
-
     listing = models.ForeignKey(
-        Listing,
-        on_delete=models.CASCADE,
-        related_name="negotiation_threads"
+        Listing, on_delete=models.CASCADE, related_name="negotiation_threads"
     )
 
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="buyer_negotiations"
+        related_name="buyer_negotiations",
     )
 
     seller = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="seller_negotiations"
+        related_name="seller_negotiations",
     )
 
     thread = models.OneToOneField(
@@ -133,18 +89,16 @@ class NegotiationThread(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name="marketplace_negotiation"
+        related_name="marketplace_negotiation",
     )
 
     status = models.CharField(
         max_length=20,
-        choices=STATUS_CHOICES,
-        default=STATUS_PENDING
+        choices=NegotiationStatus.choices,
+        default=NegotiationStatus.PENDING,
     )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("listing", "buyer")
@@ -168,9 +122,7 @@ class PurchaseRequest(models.Model):
         related_name="purchase_requests",
     )
 
-    message = models.TextField(
-        blank=True
-    )
+    message = models.TextField(blank=True)
 
     status = models.CharField(
         max_length=20,
@@ -178,13 +130,9 @@ class PurchaseRequest(models.Model):
         default=PurchaseRequestStatus.PENDING,
     )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
-    updated_at = models.DateTimeField(
-        auto_now=True
-    )
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("buyer", "listing")
