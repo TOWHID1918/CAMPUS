@@ -75,13 +75,13 @@
                 {# Check if current user is Participant A and is done, OR Participant B and is done #}
                 {% elif ctx.match.ex_p_a.author == request.user and ctx.user_a_completed or ctx.match.ex_p_b.author == request.user and ctx.user_b_completed %}
                     {# I have clicked, but my partner hasn't #}
-                    <div class="alert alert--warning" style="background: var(--orange-light); padding: 12px; border: 1px solid var(--orange-border);">
-                        <p style="margin-bottom: 10px;"><i>Waiting for partner to confirm session completion...</i></p>
+                    <div class="alert alert--warning">
+                        <p><i>Waiting for partner to confirm session completion...</i></p>
                     </div>
 
                 {% else %}
                     {# My partner clicked, I need to confirm #}
-                    <div class="alert alert--warning" style="background: var(--orange-light); padding: 12px; border: 1px solid var(--orange-border);">
+                    <div class="alert alert--warning">
                         <p style="margin-bottom: 10px;">Your partner has marked this session as complete.</p>
                         <form method="POST" action="{% url 'skill_exchange:session_complete_decision' ctx.id %}">
                             {% csrf_token %}

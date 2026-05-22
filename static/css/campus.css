@@ -205,6 +205,22 @@ img { max-width: 100%; display: block; }
 /* Remove the margin-top utility since we use 'gap' in the fixed container */
 .message + .message { margin-top: 0; }
 
+/* ── Alert component (for inline use within pages) ────────── */
+
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  border-left: 4px solid transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.alert--success { background: var(--green-light);  border-color: var(--green);  color: var(--text); }
+.alert--error   { background: var(--red-light);    border-color: var(--red);    color: var(--text); }
+.alert--info    { background: var(--blue-light);   border-color: var(--blue);   color: var(--text); }
+.alert--warning { background: var(--amber-light);  border-color: var(--amber);  color: var(--text); }
+
 /* ── Buttons ───────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
