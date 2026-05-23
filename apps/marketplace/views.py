@@ -48,6 +48,10 @@ def listing_list(request):
 
     if sort == "oldest":
         listings = listings.order_by("created_at")
+    elif sort == "price_low":
+        listings = listings.order_by("price")
+    elif sort == "price_high":
+        listings = listings.order_by("-price")
     else:
         listings = listings.order_by("-created_at")
 
@@ -395,6 +399,7 @@ def contact_seller(request, listing_id):
 @login_required
 def my_listings(request):
     search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "newest")
     listings = (
         Listing.objects.filter(seller=request.user)
         .select_related("category")
@@ -403,12 +408,21 @@ def my_listings(request):
     )
     if search:
         listings = listings.filter(title__icontains=search)
+    if sort == "oldest":
+        listings = listings.order_by("created_at")
+    elif sort == "price_low":
+        listings = listings.order_by("price")
+    elif sort == "price_high":
+        listings = listings.order_by("-price")
+    else:
+        listings = listings.order_by("-created_at")
     return render(
         request,
         "marketplace/my_listings.html",
         {
             "listings": listings,
             "current_search": search,
+            "current_sort": sort,
         },
     )
 
@@ -416,6 +430,7 @@ def my_listings(request):
 @login_required
 def my_negotiations_buyer(request):
     search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "newest")
     negotiations = (
         NegotiationThread.objects.filter(buyer=request.user)
         .select_related("listing", "listing__seller", "listing__category", "thread")
@@ -424,12 +439,21 @@ def my_negotiations_buyer(request):
     )
     if search:
         negotiations = negotiations.filter(listing__title__icontains=search)
+    if sort == "oldest":
+        negotiations = negotiations.order_by("created_at")
+    elif sort == "price_low":
+        negotiations = negotiations.order_by("listing__price")
+    elif sort == "price_high":
+        negotiations = negotiations.order_by("-listing__price")
+    else:
+        negotiations = negotiations.order_by("-created_at")
     return render(
         request,
         "marketplace/negotiations_buyer.html",
         {
             "negotiations": negotiations,
             "current_search": search,
+            "current_sort": sort,
         },
     )
 
