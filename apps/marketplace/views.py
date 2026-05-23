@@ -36,10 +36,15 @@ def listing_list(request):
     )
 
     category_id = request.GET.get("category", "")
+    search = request.GET.get("search", "").strip()
     sort = request.GET.get("sort", "newest")
 
     if category_id:
         listings = listings.filter(category_id=category_id)
+    
+    if search:
+        listings = listings.filter(title__icontains=search)
+        print(f"DEBUG search='{search}' results={listings.count()}")
 
     if sort == "oldest":
         listings = listings.order_by("created_at")
@@ -54,6 +59,7 @@ def listing_list(request):
             "categories": Category.objects.all(),
             "current_category": category_id,
             "current_sort": sort,
+            "current_search": search,
         },
     )
 

@@ -21,6 +21,22 @@
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 8px; margin-bottom: 20px;">
 
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Search listings..."
+    value="{{ current_search }}"
+    style="padding: 5px 10px; border-radius: var(--radius);
+           border: 1.5px solid var(--border-dark); background: var(--surface);
+           color: var(--text); font-size: 13px; font-family: inherit;
+           min-width: 200px;">
+
+  <button onclick="applyFilters()" style="
+    padding: 5px 14px; border-radius: var(--radius);
+    border: 1.5px solid var(--border-dark); background: var(--surface);
+    color: var(--text); font-size: 13px; font-family: inherit;
+    cursor: pointer;">Search</button>
+
   <select id="categoryFilter" class="lf-filter-select" style="
     padding: 5px 10px; border-radius: var(--radius);
     border: 1.5px solid var(--border-dark); background: var(--surface);
@@ -145,15 +161,20 @@
 
 {% block extra_js %}
 <script>
-  document.getElementById('categoryFilter').addEventListener('change', applyFilters);
-  document.getElementById('sortFilter').addEventListener('change', applyFilters);
+ document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+document.getElementById('sortFilter').addEventListener('change', applyFilters);
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') applyFilters();
+});
 
   function applyFilters() {
     const category = document.getElementById('categoryFilter').value;
     const sort     = document.getElementById('sortFilter').value;
+    const search   = document.getElementById('searchInput').value.trim();
     const params   = new URLSearchParams();
     if (category) params.set('category', category);
     if (sort !== 'newest') params.set('sort', sort);
+    if (search) params.set('search', search);
     window.location.href = '{% url "marketplace:listing_list" %}?' + params.toString();
   }
 
