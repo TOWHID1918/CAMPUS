@@ -36,13 +36,22 @@ def listing_list(request):
     )
 
     category_id = request.GET.get("category", "")
+    search = request.GET.get("search", "").strip()
     sort = request.GET.get("sort", "newest")
 
     if category_id:
         listings = listings.filter(category_id=category_id)
+    
+    if search:
+        listings = listings.filter(title__icontains=search)
+        print(f"DEBUG search='{search}' results={listings.count()}")
 
     if sort == "oldest":
         listings = listings.order_by("created_at")
+    elif sort == "price_low":
+        listings = listings.order_by("price")
+    elif sort == "price_high":
+        listings = listings.order_by("-price")
     else:
         listings = listings.order_by("-created_at")
 
@@ -54,6 +63,7 @@ def listing_list(request):
             "categories": Category.objects.all(),
             "current_category": category_id,
             "current_sort": sort,
+            "current_search": search,
         },
     )
 
@@ -86,6 +96,7 @@ def create_listing(request):
         title = request.POST.get("title", "").strip()
         description = request.POST.get("description", "").strip()
         price = request.POST.get("price", "").strip()
+        stock = request.POST.get("stock", "1").strip()
         category_id = request.POST.get("category", "")
         photos = request.FILES.getlist("photos")
 
@@ -101,6 +112,12 @@ def create_listing(request):
                     raise ValueError
             except ValueError:
                 errors.append("Enter a valid price.")
+        try:
+            stock = int(stock)
+            if stock < 1:
+                raise ValueError
+        except ValueError:
+            errors.append("Stock quantity must be a whole number of at least 1.")
 
         category = None
         if category_id:
@@ -130,6 +147,7 @@ def create_listing(request):
                 title=title,
                 description=description,
                 price=price,
+                stock=stock,
                 category=category,
             )
             for idx, f in enumerate(photos):
@@ -156,23 +174,34 @@ def edit_listing(request, listing_id):
         listing.title = request.POST.get("title", listing.title).strip()
         listing.description = request.POST.get("description", "").strip()
         price = request.POST.get("price", "").strip()
+        stock = request.POST.get("stock", "1").strip()
         category_id = request.POST.get("category", "")
 
+        errors = []
         try:
             listing.price = float(price)
         except ValueError:
+            errors.append("Enter a valid price.")
+        try:
+            stock = int(stock)
+            if stock < 1:
+                raise ValueError
+            listing.stock = stock
+        except ValueError:
+            errors.append("Stock quantity must be a whole number of at least 1.")
+        if errors:
             return render(
                 request,
                 "marketplace/listing_form.html",
                 {
                     "listing": listing,
-                    "errors": ["Enter a valid price."],
+                    "errors": errors,
                     "max_mb": MAX_PHOTO_MB,
                     "categories": Category.objects.all(),
                 },
             )
 
-        listing.category = Category.objects.filter(pk=category_id).first()
+        listing.category = Category.objects.filter(pk=category_id).first() if category_id else None
 
         status = request.POST.get("status")
         if status in ListingStatus.values:
@@ -183,6 +212,7 @@ def edit_listing(request, listing_id):
                 "title",
                 "description",
                 "price",
+                "stock",
                 "category",
                 "status",
                 "updated_at",
@@ -388,35 +418,62 @@ def contact_seller(request, listing_id):
 
 @login_required
 def my_listings(request):
+    search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "newest")
     listings = (
         Listing.objects.filter(seller=request.user)
         .select_related("category")
         .prefetch_related("photos__photo")
         .order_by("-created_at")
     )
+    if search:
+        listings = listings.filter(title__icontains=search)
+    if sort == "oldest":
+        listings = listings.order_by("created_at")
+    elif sort == "price_low":
+        listings = listings.order_by("price")
+    elif sort == "price_high":
+        listings = listings.order_by("-price")
+    else:
+        listings = listings.order_by("-created_at")
     return render(
         request,
         "marketplace/my_listings.html",
         {
             "listings": listings,
+            "current_search": search,
+            "current_sort": sort,
         },
     )
 
 
 @login_required
 def my_negotiations_buyer(request):
+    search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "newest")
     negotiations = (
         NegotiationThread.objects.filter(buyer=request.user)
         .select_related("listing", "listing__seller", "listing__category", "thread")
         .prefetch_related("listing__photos__photo")
         .order_by("-created_at")
     )
-
+    if search:
+        negotiations = negotiations.filter(listing__title__icontains=search)
+    if sort == "oldest":
+        negotiations = negotiations.order_by("created_at")
+    elif sort == "price_low":
+        negotiations = negotiations.order_by("listing__price")
+    elif sort == "price_high":
+        negotiations = negotiations.order_by("-listing__price")
+    else:
+        negotiations = negotiations.order_by("-created_at")
     return render(
         request,
         "marketplace/negotiations_buyer.html",
         {
             "negotiations": negotiations,
+            "current_search": search,
+            "current_sort": sort,
         },
     )
 

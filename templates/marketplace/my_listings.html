@@ -21,6 +21,21 @@
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 8px; margin-bottom: 20px;">
 
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Search listings..."
+    value="{{ current_search }}"
+    style="padding: 5px 10px; border-radius: var(--radius);
+           border: 1.5px solid var(--border-dark); background: var(--surface);
+           color: var(--text); font-size: 13px; font-family: inherit;
+           min-width: 200px;">
+  <button onclick="applyFilters()" style="
+    padding: 5px 14px; border-radius: var(--radius);
+    border: 1.5px solid var(--border-dark); background: var(--surface);
+    color: var(--text); font-size: 13px; font-family: inherit;
+    cursor: pointer;">Search</button>
+
   <select id="categoryFilter" class="lf-filter-select" style="
     padding: 5px 10px; border-radius: var(--radius);
     border: 1.5px solid var(--border-dark); background: var(--surface);
@@ -43,6 +58,8 @@
     margin-left: auto;">
     <option value="newest" {% if current_sort == "newest" %}selected{% endif %}>Newest First</option>
     <option value="oldest" {% if current_sort == "oldest" %}selected{% endif %}>Oldest First</option>
+    <option value="price_low" {% if current_sort == "price_low" %}selected{% endif %}>Price: Low to High</option>
+    <option value="price_high" {% if current_sort == "price_high" %}selected{% endif %}>Price: High to Low</option>
   </select>
 </div>
 
@@ -144,21 +161,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'marketplace/js/marketplace.js' %}"></script>
 <script>
-  document.getElementById('categoryFilter').addEventListener('change', applyFilters);
-  document.getElementById('sortFilter').addEventListener('change', applyFilters);
-
-  function applyFilters() {
-    const category = document.getElementById('categoryFilter').value;
-    const sort     = document.getElementById('sortFilter').value;
-    const params   = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (sort !== 'newest') params.set('sort', sort);
-    window.location.href = '{% url "marketplace:listing_list" %}?' + params.toString();
-  }
-
-  const cards = document.querySelectorAll('.post-card');
-  const count = document.getElementById('filterCount');
-  if (count) count.textContent = cards.length + ' listing' + (cards.length !== 1 ? 's' : '');
+  const myListingsUrl = '{% url "marketplace:my_listings" %}';
+  initMyListings();
 </script>
 {% endblock %}
