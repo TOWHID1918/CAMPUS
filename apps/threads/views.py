@@ -16,14 +16,7 @@ from apps.media.models import Photo
 
 @login_required
 def thread_detail(request, thread_id):
-    thread = get_object_or_404(
-        Thread.objects.prefetch_related(
-            "marketplace_negotiation__listing",
-            "marketplace_negotiation__buyer",
-            "marketplace_negotiation__seller",
-        ),
-        pk=thread_id,
-    )
+    thread = get_object_or_404(Thread, pk=thread_id)
     if not ThreadParticipant.objects.filter(thread=thread, user=request.user).exists():
         messages.error(request, "You are not a participant in this thread.")
         return redirect("home")
