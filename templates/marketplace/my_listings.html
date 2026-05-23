@@ -161,26 +161,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'marketplace/js/marketplace.js' %}"></script>
 <script>
-  document.getElementById('categoryFilter').addEventListener('change', applyFilters);
-  document.getElementById('sortFilter').addEventListener('change', applyFilters);
-  document.getElementById('searchInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') applyFilters();
-});
-
-  function applyFilters() {
-    const category = document.getElementById('categoryFilter').value;
-    const sort     = document.getElementById('sortFilter').value;
-    const search   = document.getElementById('searchInput').value.trim();
-    const params   = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (sort !== 'newest') params.set('sort', sort);
-    if (search) params.set('search', search);
-    window.location.href = '{% url "marketplace:my_listings" %}?' + params.toString();
-  }
-
-  const cards = document.querySelectorAll('.post-card');
-  const count = document.getElementById('filterCount');
-  if (count) count.textContent = cards.length + ' listing' + (cards.length !== 1 ? 's' : '');
+  const myListingsUrl = '{% url "marketplace:my_listings" %}';
+  initMyListings();
 </script>
 {% endblock %}

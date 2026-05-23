@@ -96,6 +96,7 @@ def create_listing(request):
         title = request.POST.get("title", "").strip()
         description = request.POST.get("description", "").strip()
         price = request.POST.get("price", "").strip()
+        stock = request.POST.get("stock", "1").strip()
         category_id = request.POST.get("category", "")
         photos = request.FILES.getlist("photos")
 
@@ -111,6 +112,12 @@ def create_listing(request):
                     raise ValueError
             except ValueError:
                 errors.append("Enter a valid price.")
+        try:
+            stock = int(stock)
+            if stock < 1:
+                raise ValueError
+        except ValueError:
+            errors.append("Stock quantity must be a whole number of at least 1.")
 
         category = None
         if category_id:
@@ -140,6 +147,7 @@ def create_listing(request):
                 title=title,
                 description=description,
                 price=price,
+                stock=stock,
                 category=category,
             )
             for idx, f in enumerate(photos):
@@ -166,17 +174,28 @@ def edit_listing(request, listing_id):
         listing.title = request.POST.get("title", listing.title).strip()
         listing.description = request.POST.get("description", "").strip()
         price = request.POST.get("price", "").strip()
+        stock = request.POST.get("stock", "1").strip()
         category_id = request.POST.get("category", "")
 
+        errors = []
         try:
             listing.price = float(price)
         except ValueError:
+            errors.append("Enter a valid price.")
+        try:
+            stock = int(stock)
+            if stock < 1:
+                raise ValueError
+            listing.stock = stock
+        except ValueError:
+            errors.append("Stock quantity must be a whole number of at least 1.")
+        if errors:
             return render(
                 request,
                 "marketplace/listing_form.html",
                 {
                     "listing": listing,
-                    "errors": ["Enter a valid price."],
+                    "errors": errors,
                     "max_mb": MAX_PHOTO_MB,
                     "categories": Category.objects.all(),
                 },
@@ -193,6 +212,7 @@ def edit_listing(request, listing_id):
                 "title",
                 "description",
                 "price",
+                "stock",
                 "category",
                 "status",
                 "updated_at",
