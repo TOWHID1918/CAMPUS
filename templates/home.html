@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}CAMPUS — Collaborative Academic Modules &amp; Peer Utility System{% endblock %}
+{% block title %}ConnectU — The Unified Student Community Platform{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'css/home.css' %}">
@@ -11,15 +11,15 @@
 
 {# ── Hero ──────────────────────────────────────────────────── #}
 <div class="hero">
-  <p class="hero__eyebrow">University Platform</p>
+  <p class="hero__eyebrow">Digitizing Campus Life</p>
 
   <h1 class="hero__title">
-    One place for<br>
-    <span>every campus need.</span>
+    The unified student<br>
+    <span>community platform.</span>
   </h1>
 
   <p class="hero__subtitle">
-    CAMPUS brings together skill exchange, discussion, lost &amp; found,
+    ConnectU brings together various collaborative academic modules such as skill exchange, discussion forum, lost &amp; found,
     ride sharing, and a marketplace — built for students, by students.
   </p>
 
@@ -95,7 +95,7 @@
     </a>
 
     {# 4. Ride Share #}
-    <a href="#" class="feature-card">
+    <a href="{% url 'ride_share:all_rides' %}" class="feature-card">
       <div class="feature-card__icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -109,11 +109,11 @@
       <p class="feature-card__desc">
         Match with fellow students for shared rides and cut travel costs.
       </p>
-      <span class="feature-card__link">Coming soon →</span>
+      <span class="feature-card__link">Open →</span>
     </a>
 
     {# 5. Marketplace #}
-    <a href="#" class="feature-card">
+    <a href="{% url 'marketplace:listing_list' %}" class="feature-card">
       <div class="feature-card__icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -126,7 +126,7 @@
       <p class="feature-card__desc">
         Buy, sell, and swap textbooks, gear, and more within the campus.
       </p>
-      <span class="feature-card__link">Coming soon →</span>
+      <span class="feature-card__link">Open →</span>
     </a>
 
   </div>
@@ -145,7 +145,6 @@
   <span>
     <strong>CAMPUS is in open beta.</strong>
     Some modules are still under development.
-    Lost &amp; Found is live now — give it a try.
   </span>
 </div>
 
