@@ -172,7 +172,7 @@ def edit_listing(request, listing_id):
                 },
             )
 
-        listing.category = Category.objects.filter(pk=category_id).first()
+        listing.category = Category.objects.filter(pk=category_id).first() if category_id else None
 
         status = request.POST.get("status")
         if status in ListingStatus.values:
