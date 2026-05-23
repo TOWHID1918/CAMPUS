@@ -48,7 +48,7 @@ class VoteStatus(models.TextChoices):
 # Skill Exchange domain choices
 class SkillStatus(models.TextChoices):
     PENDING = "pending", "Pending"
-    ACCEPTED = "accepted", "Accepted"
+    VERIFIED = "verified", "Verified"
     REJECTED = "rejected", "Rejected"
 
 
