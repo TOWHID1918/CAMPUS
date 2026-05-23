@@ -394,35 +394,42 @@ def contact_seller(request, listing_id):
 
 @login_required
 def my_listings(request):
+    search = request.GET.get("search", "").strip()
     listings = (
         Listing.objects.filter(seller=request.user)
         .select_related("category")
         .prefetch_related("photos__photo")
         .order_by("-created_at")
     )
+    if search:
+        listings = listings.filter(title__icontains=search)
     return render(
         request,
         "marketplace/my_listings.html",
         {
             "listings": listings,
+            "current_search": search,
         },
     )
 
 
 @login_required
 def my_negotiations_buyer(request):
+    search = request.GET.get("search", "").strip()
     negotiations = (
         NegotiationThread.objects.filter(buyer=request.user)
         .select_related("listing", "listing__seller", "listing__category", "thread")
         .prefetch_related("listing__photos__photo")
         .order_by("-created_at")
     )
-
+    if search:
+        negotiations = negotiations.filter(listing__title__icontains=search)
     return render(
         request,
         "marketplace/negotiations_buyer.html",
         {
             "negotiations": negotiations,
+            "current_search": search,
         },
     )
 
