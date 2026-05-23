@@ -4,15 +4,10 @@ from apps.common.choices import (
     ExchangePostStatus,
     ExchangeMatchStatus,
     ExchangeSessionStatus,
-    # SessionFeedbackStatus,
     SkillStatus,
-    # SessionEndRequestStatus,
-    # MatchDecisionStatus,
-    # ThreadStatus,
 )
 
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db.models import Avg
 
 
 class Skill(models.Model):
@@ -148,28 +143,6 @@ class ExchangeMatch(models.Model):
         ]
 
 
-# class MatchDecision(models.Model):
-#     decided_at = models.DateTimeField(auto_now_add=True)
-
-#     decided_by = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         on_delete=models.CASCADE,
-#         related_name="match_decisions",
-#     )
-#     status = models.CharField(
-#         max_length=20,
-#         choices=MatchDecisionStatus.choices,
-#         default=MatchDecisionStatus.PENDING,
-#     )
-#     exchange_match = models.ForeignKey(ExchangeMatch, on_delete=models.CASCADE)
-
-#     def __str__(self):
-#         return f"Decision {self.id} by {self.decided_by.email} for Match {self.exchange_match.id}"
-
-#     class Meta:
-#         unique_together = ("decided_by", "exchange_match")
-
-
 class ExchangeSession(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -246,32 +219,3 @@ class SessionFeedback(models.Model):
 
     def __str__(self):
         return f"{self.rating}/10 for {self.rated_user.email}"
-
-
-# class SessionEndRequest(models.Model):
-#     """Track session end requests - both users must agree to end a session"""
-
-#     requested_by = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         on_delete=models.CASCADE,
-#         related_name="session_end_requests_made",
-#     )
-#     exchange_session = models.ForeignKey(
-#         ExchangeSession,
-#         on_delete=models.CASCADE,
-#         related_name="end_requests",
-#     )
-#     status = models.CharField(
-#         max_length=20,
-#         choices=SessionEndRequestStatus.choices,
-#         default=SessionEndRequestStatus.PENDING,
-#     )
-#     requested_at = models.DateTimeField(auto_now_add=True)
-#     responded_at = models.DateTimeField(null=True, blank=True)
-
-#     def __str__(self):
-#         return f"End Request {self.id} for Session {self.exchange_session.id} by {self.requested_by.email}"
-
-#     class Meta:
-#         # Only one pending end request per session
-#         unique_together = ("exchange_session", "status")

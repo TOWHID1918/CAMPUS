@@ -7,9 +7,7 @@ app_name = "skill_exchange"
 urlpatterns = [
     path("posts/", views.post_list, name="post_list"),
     path("posts/new/", views.post_create, name="post_create"),
-    path(
-        "posts/<int:post_id>/delete/", views.post_delete, name="post_delete"
-    ),  # Updated
+    path("posts/<int:post_id>/delete/", views.post_delete, name="post_delete"),
     path("matches/", views.match_list, name="match_list"),
     path("sessions/", views.session_list, name="session_list"),
     path(
@@ -27,15 +25,4 @@ urlpatterns = [
         views.submit_session_feedback,
         name="submit_session_feedback",
     ),
-    # path("sessions/<int:session_id>/", views.session_detail, name="session_detail"),
-    # path(
-    #     "sessions/<int:session_id>/end-request/",
-    #     views.session_end_request,
-    #     name="session_end_request",
-    # ),
-    # path(
-    #     "sessions/<int:session_id>/end-decision/",
-    #     views.session_end_decision,
-    #     name="session_end_decision",
-    # ),
 ]
