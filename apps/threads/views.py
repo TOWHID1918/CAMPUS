@@ -1,5 +1,4 @@
 from django.shortcuts import redirect, render, get_object_or_404
-from django.db.models import Prefetch
 
 from django.db import transaction
 from django.contrib import messages
@@ -7,7 +6,11 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
 from .models import Thread, ThreadMessage, MessageAttachment, ThreadParticipant
-from apps.common.choices import ThreadStatus, ThreadParticipantRole
+from apps.common.choices import (
+    ThreadStatus,
+    ThreadParticipantRole,
+    RideGroupMemberStatus,
+)
 from apps.media.models import Photo
 
 
@@ -17,9 +20,9 @@ def thread_detail(request, thread_id):
         Thread.objects.prefetch_related(
             "marketplace_negotiation__listing",
             "marketplace_negotiation__buyer",
-            "marketplace_negotiation__seller"
+            "marketplace_negotiation__seller",
         ),
-        pk=thread_id
+        pk=thread_id,
     )
     if not ThreadParticipant.objects.filter(thread=thread, user=request.user).exists():
         messages.error(request, "You are not a participant in this thread.")
@@ -59,11 +62,20 @@ def thread_detail(request, thread_id):
     elif hasattr(thread, "exchange_session"):
         skill_exchange_context = getattr(thread, "exchange_session")
         base_template = "skill_exchange/base.html"
-    elif hasattr(thread, "negotiation_thread"):
-        marketplace_context = getattr(thread, "negotiation_thread")
+    elif hasattr(thread, "marketplace_negotiation"):
+        marketplace_context = getattr(thread, "marketplace_negotiation")
         base_template = "marketplace/base.html"
     elif hasattr(thread, "ride_group"):
-        ride_group_context = getattr(thread, "ride_group")
+        ride_group = getattr(thread, "ride_group")
+        ride_group_context = {
+            "ride_group": ride_group,
+            "ride_post": ride_group.ride_post,
+            "members": list(
+                ride_group.members.filter(
+                    status=RideGroupMemberStatus.CONFIRMED
+                ).select_related("user")
+            ),
+        }
         base_template = "ride_share/base.html"
 
     context = {
