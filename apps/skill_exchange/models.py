@@ -5,6 +5,7 @@ from apps.common.choices import (
     ExchangeMatchStatus,
     ExchangeSessionStatus,
     SkillStatus,
+    UserSkillStatus,
 )
 
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -35,6 +36,10 @@ class UserSkill(models.Model):
         related_name="user_skills",
     )
     skill = models.ForeignKey(Skill, on_delete=models.CASCADE)
+
+    status = models.CharField(
+        max_length=20, choices=UserSkillStatus.choices, default=UserSkillStatus.PENDING
+    )
 
     def __str__(self):
         return f"{self.user.email} - {self.skill.name}"

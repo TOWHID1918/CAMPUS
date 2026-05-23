@@ -52,6 +52,12 @@ class SkillStatus(models.TextChoices):
     REJECTED = "rejected", "Rejected"
 
 
+class UserSkillStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    VERIFIED = "verified", "Verified"
+    REJECTED = "rejected", "Rejected"
+
+
 class ExchangePostStatus(models.TextChoices):
     MATCHING = "matching", "Matching"
     DELETED = "deleted", "Deleted"
