@@ -37,8 +37,8 @@ html[data-theme="dark"] {
 }
 
 .ride-share-container {
-    padding: 2rem 0;
-    max-width: 1200px;
+    padding: 8px 20px 0 20px;
+    max-width: 992px;
     margin: 0 auto;
     color: var(--text-color);
 }
@@ -65,18 +65,19 @@ html[data-theme="dark"] {
 }
 
 .ride-filters {
-    background: var(--light-bg);
+    background: var(--surface);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
-    padding: 1.5rem;
+    padding: 1.25rem;
     margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
 }
 
 .filter-form {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
     gap: 1rem;
-    align-items: flex-end;
-    flex-wrap: wrap;
+    align-items: end;
 }
 
 .filter-group {
@@ -106,6 +107,21 @@ html[data-theme="dark"] {
 .filter-actions {
     display: flex;
     gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .filter-form {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-actions {
+        justify-content: stretch;
+    }
+
+    .filter-actions .btn {
+        flex: 1;
+    }
 }
 
 .rides-grid {

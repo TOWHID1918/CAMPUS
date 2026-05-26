@@ -1,13 +1,13 @@
 {% extends 'ride_share/base.html' %}
 {% load static %}
 
-{% block title %}Create a Ride - CAMPUS{% endblock %}
+{% block title %}Monitor a Ride - CAMPUS{% endblock %}
 
 {% block ride_content %}
 <div class="create-ride-container">
     <div class="create-ride-header">
-        <h1><i class="fas fa-plus"></i> Create a New Ride</h1>
-        <p>Share a ride and earn points by helping fellow students</p>
+        <h1><i class="fas fa-bell"></i> Monitor a Ride</h1>
+        <p>Tell the system what you need, and it will keep checking existing and new rides for matches</p>
     </div>
 
     <div class="create-ride-form-wrapper">
@@ -15,15 +15,15 @@
             {% csrf_token %}
 
             <div class="form-section">
-                <h3>Location & Direction</h3>
+                <h3>Trip Intent</h3>
                 <div class="form-group">
                     <label>{{ form.direction.label }}</label>
                     <div class="direction-options">
                         {% for value, label in form.direction.field.choices %}
                             <div class="form-check">
-                                <input class="form-check-input" 
-                                       type="radio" 
-                                       name="direction" 
+                                <input class="form-check-input"
+                                       type="radio"
+                                       name="direction"
                                        value="{{ value }}"
                                        id="direction_{{ value }}"
                                        {% if form.direction.value == value %}checked{% endif %}>
@@ -54,7 +54,7 @@
                             {{ form.starting_location.errors }}
                         </div>
                     {% endif %}
-                    <small class="form-text text-muted">Where are you starting from?</small>
+                    <small class="form-text text-muted">Where will you start from?</small>
                 </div>
 
                 <div class="form-group">
@@ -71,12 +71,12 @@
                             {{ form.destination_location.errors }}
                         </div>
                     {% endif %}
-                    <small class="form-text text-muted">Where are you going?</small>
+                    <small class="form-text text-muted">Where do you need to go?</small>
                 </div>
             </div>
 
             <div class="form-section">
-                <h3>Ride Details</h3>
+                <h3>Match Criteria</h3>
                 <div class="form-group">
                     {{ form.transport_method.label_tag }}
                     {{ form.transport_method }}
@@ -85,7 +85,7 @@
                             {{ form.transport_method.errors }}
                         </div>
                     {% endif %}
-                    <small class="form-text text-muted">What type of vehicle will you use?</small>
+                    <small class="form-text text-muted">Optional. If set, the system will match rides in this category too.</small>
                 </div>
 
                 <div class="form-group">
@@ -96,12 +96,12 @@
                             {{ form.departure_time.errors }}
                         </div>
                     {% endif %}
-                    <small class="form-text text-muted">When are you leaving?</small>
+                    <small class="form-text text-muted">Optional reference time for your request. Matching does not depend on this anymore.</small>
                 </div>
             </div>
 
             <div class="form-section">
-                <h3>Additional Information</h3>
+                <h3>Notes</h3>
                 <div class="form-group">
                     {{ form.notes.label_tag }}
                     {{ form.notes }}
@@ -110,7 +110,7 @@
                             {{ form.notes.errors }}
                         </div>
                     {% endif %}
-                    <small class="form-text text-muted">Any special requirements or information for riders?</small>
+                    <small class="form-text text-muted">Optional details to help you review matches later.</small>
                 </div>
             </div>
 
@@ -122,9 +122,9 @@
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="fas fa-paper-plane"></i> Create Ride
+                    <i class="fas fa-search"></i> Start Monitoring
                 </button>
-                <a href="{% url 'ride_share:all_rides' %}" class="btn btn-secondary btn-lg">
+                <a href="{% url 'ride_share:my_matches' %}" class="btn btn-secondary btn-lg">
                     Cancel
                 </a>
             </div>

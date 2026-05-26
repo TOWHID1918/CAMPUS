@@ -185,3 +185,13 @@ class RideGroupMemberStatus(models.TextChoices):
     CONFIRMED = "confirmed", "Confirmed"
     LEFT = "left", "Left"
     NO_SHOW = "no_show", "No Show"
+
+class RideMonitorRequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    CLOSED = "closed", "Closed"
+
+
+class RideMonitorMatchStatus(models.TextChoices):
+    NEW = "new", "New"
+    JOINED = "joined", "Joined"
+    DISMISSED = "dismissed", "Dismissed"

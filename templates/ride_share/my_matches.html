@@ -5,8 +5,11 @@
   <div class="campus-header__row">
     <div>
       <h1>My Matches</h1>
-      <p>Rides you've joined and your pending requests ~</p>
+      <p>Rides you've joined, pending join requests, and ride monitor results</p>
     </div>
+    <a href="{% url 'ride_share:request_ride' %}" class="btn btn--primary">
+      Monitor a Ride
+    </a>
   </div>
 </div>
 
@@ -30,7 +33,7 @@
                       {% include 'ride_share/includes/member_avatar.html' with user=post.user size=40 %}
                       <div>
                         <strong>{{ post.user.profile.handle }}</strong>
-                        <small style="display: block; color: var(--text-muted);">Organizer</small>
+                        <small style="display: block; color: var(--text-muted);">Organizer · ID: {{ post.id }}</small>
                       </div>
                     </div>
                     <span class="badge {% if ride_group.status == 'in_transit' %}badge--active{% else %}badge--muted{% endif %}">
@@ -57,7 +60,7 @@
                   <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
                     <div>
                       <small style="color: var(--text-muted); display: block;">Departure</small>
-                      <strong>{{ post.departure_time|date:"M d, H:i" }}</strong>
+                      <strong>{{ post.departure_time|date:"M d, g:i A" }}</strong>
                     </div>
                     <div>
                       <small style="color: var(--text-muted); display: block;">Transport</small>
@@ -73,7 +76,7 @@
                   <div style="display: flex; gap: 0.5rem;">
                     <a href="{% url 'ride_share:ride_chat' post.pk %}" class="btn btn--primary" style="flex: 1;">Chat</a>
                     <a href="{% url 'ride_share:ride_detail' post.id %}" class="btn btn--outline" style="flex: 1;">View Details</a>
-                    <form method="POST" action="{% url 'ride_share:leave_ride' ride_group.id %}" style="display: inline; flex: 1;">
+                    <form method="POST" action="{% url 'ride_share:leave_ride' post.id %}" style="display: inline; flex: 1;">
                       {% csrf_token %}
                       <button type="submit" class="btn btn--outline" style="width: 100%; color: var(--red); border-color: var(--red-light); cursor: pointer;">Leave</button>
                     </form>
@@ -88,11 +91,11 @@
   </div>
 {% endif %}
 
-<!-- Pending Requests -->
+<!-- Pending Join Requests -->
 {% if pending_matches %}
   <div>
     <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--warning-color);">
-      Pending Requests ({{ pending_matches|length }})
+      Pending Join Requests ({{ pending_matches|length }})
     </h2>
     
     <div class="card">
@@ -106,7 +109,7 @@
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <div>
                       <strong>{{ post.user.profile.handle }}</strong>
-                      <small style="display: block; color: var(--text-muted);">Requested {{ req.joined_at|date:"M d, Y" }}</small>
+                      <small style="display: block; color: var(--text-muted);">Requested {{ req.joined_at|date:"M d, Y" }} · ID: {{ post.id }}</small>
                     </div>
                     <span class="badge" style="background: var(--warning-light); color: var(--warning);">Awaiting Response</span>
                   </div>
@@ -114,7 +117,7 @@
                   <!-- Route -->
                   <div style="background: var(--light-bg); padding: 12px; border-radius: 0.5rem; margin-bottom: 12px;">
                     <strong style="display: block; margin-bottom: 8px;">{{ post.starting_location }} → {{ post.destination_location }}</strong>
-                    <small style="color: var(--text-muted);">{{ post.departure_time|date:"M d, H:i" }}</small>
+                    <small style="color: var(--text-muted);">{{ post.departure_time|date:"M d, g:i A" }}</small>
                   </div>
 
                   <!-- Party Size -->
@@ -137,13 +140,118 @@
   </div>
 {% endif %}
 
+<!-- Left Rides -->
+{% if left_rides %}
+  <div style="margin-top: 2rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border);">
+      Left Rides ({{ left_rides|length }})
+    </h2>
+
+    <div class="card">
+      <div class="card__body">
+        <div style="display: grid; gap: 1rem;">
+          {% for membership in left_rides %}
+            {% with post=membership.group.ride_post %}
+              <div class="card ride-card" style="border: 1px solid var(--border);">
+                <div class="card__body">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 1rem;">
+                    <div>
+                      <strong>{{ post.starting_location }} → {{ post.destination_location }}</strong>
+                      <small style="display: block; color: var(--text-muted);">Left on {{ membership.updated_at|date:"M d, Y g:i A" }}</small>
+                    </div>
+                    <span class="badge badge--muted">Left</span>
+                  </div>
+
+                  <div style="background: var(--light-bg); padding: 12px; border-radius: 0.5rem; margin-bottom: 12px;">
+                    <small style="color: var(--text-muted); display: block; margin-bottom: 6px;">Departure</small>
+                    <strong>{{ post.departure_time|date:"M d, Y g:i A" }}</strong>
+                  </div>
+
+                  <a href="{% url 'ride_share:approach_ride' post.pk %}" class="btn btn--primary" style="width: 100%;">Rejoin Ride</a>
+                </div>
+              </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Ride Monitor Requests -->
+{% if monitor_requests %}
+  <div style="margin-top: 2rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary);">
+      Ride Monitor Requests ({{ monitor_requests|length }})
+    </h2>
+
+    <div class="card">
+      <div class="card__body">
+        <div style="display: grid; gap: 1rem;">
+          {% for monitor in monitor_requests %}
+            <div class="card ride-card" style="border: 1px solid var(--border);">
+              <div class="card__body">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 1rem;">
+                  <div>
+                    <strong>{{ monitor.get_direction_display }}</strong>
+                    <small style="display: block; color: var(--text-muted);">Created {{ monitor.created_at|date:"M d, Y" }}</small>
+                  </div>
+                  <span class="badge badge--active">{{ monitor.get_status_display }}</span>
+                </div>
+
+                <div style="background: var(--light-bg); padding: 12px; border-radius: 0.5rem; margin-bottom: 12px;">
+                  <strong style="display: block; margin-bottom: 6px;">{{ monitor.starting_location }} → {{ monitor.destination_location }}</strong>
+                  <small style="color: var(--text-muted);">{{ monitor.departure_time|date:"M d, g:i A" }} · {{ monitor.get_transport_method_display }}</small>
+                </div>
+
+                {% if monitor.notes %}
+                  <p style="color: var(--text-muted); margin-bottom: 12px; white-space: pre-wrap;">{{ monitor.notes }}</p>
+                {% endif %}
+
+                <div style="display: grid; gap: 0.75rem;">
+                  <div>
+                    <strong style="display: block; margin-bottom: 0.5rem;">Matched Rides ({{ monitor.matches.count }})</strong>
+                    {% if monitor.matches.all %}
+                      <div style="display: grid; gap: 0.75rem;">
+                        {% for match in monitor.matches.all %}
+                          {% with post=match.ride_post %}
+                            <div style="border: 1px solid var(--border); border-radius: 0.75rem; padding: 12px;">
+                              <div style="display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start;">
+                                <div>
+                                  <strong>{{ post.starting_location }} → {{ post.destination_location }}</strong>
+                                  <small style="display: block; color: var(--text-muted);">{{ post.departure_time|date:"M d, g:i A" }} · {{ post.get_transport_method_display }}</small>
+                                  <small style="display: block; color: var(--text-muted);">Posted by {{ post.user.get_full_name|default:post.user.email }}</small>
+                                </div>
+                                <div style="text-align: right;">
+                                  <a href="{% url 'ride_share:ride_detail' post.pk %}" class="btn btn--outline btn--sm">View Ride</a>
+                                </div>
+                              </div>
+                            </div>
+                          {% endwith %}
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <p style="color: var(--text-muted); margin: 0;">No matches yet. The system will keep checking new posts.</p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
 <!-- Empty State -->
-{% if not confirmed_rides and not pending_matches %}
+{% if not confirmed_rides and not pending_matches and not monitor_requests %}
   <div class="card">
     <div class="card__body">
       <div class="sx-empty-state">
-        <p>You haven't joined any rides yet.</p>
+        <p>You haven't joined any rides or created any monitor requests yet.</p>
         <a href="{% url 'ride_share:all_rides' %}" class="btn btn--primary" style="margin-top: 16px;">Browse Available Rides</a>
+        <a href="{% url 'ride_share:request_ride' %}" class="btn btn--outline" style="margin-top: 12px;">Monitor a Ride</a>
       </div>
     </div>
   </div>
