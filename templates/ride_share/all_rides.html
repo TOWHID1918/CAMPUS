@@ -7,53 +7,66 @@
       <h1>All Rides</h1>
       <p>Find and join rides heading to your destination ~</p>
     </div>
+    <a href="{% url 'ride_share:request_ride' %}" class="btn btn--primary">Monitor a Ride</a>
   </div>
 </div>
 
 <!-- Filters -->
-<div class="card" style="margin-bottom: 2rem;">
-  <div class="card__body">
-    <form method="get" class="ride-filters-form">
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: end;">
-        <div>
-          <label for="direction" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Direction</label>
-          <select name="direction" id="direction" class="form-control">
-            <option value="">All Directions</option>
-            {% for value, label in directions %}
-              <option value="{{ value }}" {% if selected_direction == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="transport" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Transport</label>
-          <select name="transport" id="transport" class="form-control">
-            <option value="">All Types</option>
-            {% for value, label in transports %}
-              <option value="{{ value }}" {% if selected_transport == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label for="location" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Location</label>
-          <input type="text" name="location" id="location" class="form-control" placeholder="Search location..." value="{{ selected_location }}">
-        </div>
-        <div>
-          <button type="submit" class="btn btn--primary">Filter</button>
-          <a href="{% url 'ride_share:all_rides' %}" class="btn btn--outline" style="margin-left: 0.5rem;">Clear</a>
-        </div>
-      </div>
-    </form>
-  </div>
+<div class="ride-filter-bar" style="
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin-bottom: 20px;">
+
+  <form method="get" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%;">
+    <select name="direction" id="direction" style="
+      padding: 5px 10px; border-radius: var(--radius);
+      border: 1.5px solid var(--border-dark); background: var(--surface);
+      color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;">
+      <option value="">All Directions</option>
+      {% for value, label in directions %}
+        <option value="{{ value }}" {% if selected_direction == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="transport" id="transport" style="
+      padding: 5px 10px; border-radius: var(--radius);
+      border: 1.5px solid var(--border-dark); background: var(--surface);
+      color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;">
+      <option value="">All Types</option>
+      {% for value, label in transports %}
+        <option value="{{ value }}" {% if selected_transport == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="location" id="location" style="
+      padding: 5px 10px; border-radius: var(--radius);
+      border: 1.5px solid var(--border-dark); background: var(--surface);
+      color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;">
+      <option value="">All Locations</option>
+      {% for location in locations %}
+        <option value="{{ location.pk }}" {% if selected_location == location.pk %}selected{% endif %}>{{ location.name }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" style="
+      padding: 5px 14px; border-radius: var(--radius);
+      border: 1.5px solid var(--border-dark); background: var(--surface);
+      color: var(--text); font-size: 13px; font-family: inherit;
+      cursor: pointer;">Filter</button>
+
+    <a href="{% url 'ride_share:all_rides' %}" style="
+      padding: 5px 14px; border-radius: var(--radius);
+      border: 1.5px solid var(--border-dark); background: var(--surface);
+      color: var(--text); font-size: 13px; font-family: inherit;
+      cursor: pointer; text-decoration: none;">Clear</a>
+  </form>
 </div>
 
 <!-- Rides Grid -->
-<div class="card">
-  <div class="card__body">
-    {% if posts %}
-      <div style="display: grid; gap: 1rem;">
-        {% for post in posts %}
-          <div class="card ride-card" style="border: 1px solid var(--border);">
-            <div class="card__body">
+{% if posts %}
+  <div style="display: grid; gap: 1rem;">
+    {% for post in posts %}
+      <div class="card ride-card" style="border: 1px solid var(--border);">
+        <div class="card__body">
               <!-- Header -->
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -66,7 +79,7 @@
                   {% endif %}
                   <div>
                     <strong>{{ post.user.profile.handle }}</strong>
-                    <small style="display: block; color: var(--text-muted);">{{ post.created_at|date:"M d, Y H:i" }}</small>
+                    <small style="display: block; color: var(--text-muted);">{{ post.created_at|date:"M d, Y g:i A" }}</small>
                   </div>
                 </div>
                 <span class="badge {% if post.status == 'open' %}badge--active{% else %}badge--muted{% endif %}">
@@ -93,7 +106,7 @@
               <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
                 <div>
                   <small style="color: var(--text-muted); display: block;">Time</small>
-                  <strong>{{ post.departure_time|date:"H:i" }}</strong>
+                  <strong>{{ post.departure_time|date:"g:i A" }}</strong>
                 </div>
                 <div>
                   <small style="color: var(--text-muted); display: block;">Transport</small>
@@ -135,7 +148,5 @@
         <a href="{% url 'ride_share:create_ride' %}" class="btn btn--primary" style="margin-top: 16px;">Create your first ride</a>
       </div>
     {% endif %}
-  </div>
-</div>
 
 {% endblock %}

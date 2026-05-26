@@ -1,8 +1,26 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
-    RidePost, RideGroup, RideGroupMember
+    Location, RidePost, RideGroup, RideGroupMember, RideMonitorRequest, RideMonitorMatch
 )
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ['name', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ('Location', {
+            'fields': ('name', 'is_active')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 @admin.register(RidePost)
 class RidePostAdmin(admin.ModelAdmin):
@@ -11,7 +29,7 @@ class RidePostAdmin(admin.ModelAdmin):
         'transport_method', 'departure_time', 'status', 'created_at'
     ]
     list_filter = ['status', 'transport_method', 'direction', 'created_at', 'deleted_at']
-    search_fields = ['user__email', 'starting_location', 'destination_location']
+    search_fields = ['user__email', 'starting_location__name', 'destination_location__name']
     readonly_fields = ['created_at', 'updated_at', 'deleted_at', 'max_capacity']
     
     fieldsets = (
@@ -103,6 +121,25 @@ class RideGroupMemberAdmin(admin.ModelAdmin):
     def is_initiator_display(self, obj):
         return "YES" if obj.is_initiator else "NO"
     is_initiator_display.short_description = "Initiator"
+
+
+@admin.register(RideMonitorRequest)
+class RideMonitorRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'user', 'direction', 'starting_location', 'destination_location',
+        'transport_method', 'departure_time', 'status', 'last_matched_at'
+    ]
+    list_filter = ['status', 'direction', 'transport_method', 'created_at']
+    search_fields = ['user__email', 'starting_location__name', 'destination_location__name']
+    readonly_fields = ['created_at', 'updated_at', 'deleted_at', 'last_matched_at']
+
+
+@admin.register(RideMonitorMatch)
+class RideMonitorMatchAdmin(admin.ModelAdmin):
+    list_display = ['id', 'monitor_request', 'ride_post', 'status', 'matched_at', 'notified_at']
+    list_filter = ['status', 'matched_at']
+    search_fields = ['monitor_request__user__email', 'ride_post__user__email']
+    readonly_fields = ['matched_at', 'updated_at']
 
 
 

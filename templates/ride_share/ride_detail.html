@@ -9,7 +9,7 @@
       <div>
         <span class="badge badge--{{ ride_post.status|lower }}">{{ ride_post.get_status_display }}</span>
         <h1>{{ ride_post.starting_location }} → {{ ride_post.destination_location }}</h1>
-        <p>{{ ride_post.departure_time|date:"D, M d, Y · H:i" }}</p>
+        <p>{{ ride_post.departure_time|date:"D, M d, Y · g:i A" }}</p>
       </div>
       <a href="{% url 'ride_share:all_rides' %}" class="btn btn--outline btn--sm">← Back</a>
     </div>
