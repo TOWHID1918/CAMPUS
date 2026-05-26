@@ -69,10 +69,11 @@
             <textarea name="content" rows="2" placeholder="Replying to {{ message.sender.handle|default:message.sender.email }}..." required></textarea>
           </div>
           <div class="flex items-center justify-between">
-            <input type="file" name="uploaded_photos" multiple class="text-small" style="max-width: 200px;">
+            <input type="file" name="uploaded_photos" multiple class="text-small" style="flex: 1; min-width: 0;">
             <div class="flex flex-gap-8">
-              <button type="button" class="btn btn--ghost btn--sm cancel-reply-btn" data-target-id="{{ message.id }}">Cancel</button>
               <button type="submit" class="btn btn--primary btn--sm">Submit</button>
+              <button type="button" class="btn btn--ghost btn--sm cancel-reply-btn" data-target-id="{{ message.id }}">Cancel</button>
+              
             </div>
           </div>
         </form>
@@ -81,7 +82,7 @@
   </div>
 
   {% if message.replies_list %}
-    <div class="forum-nested-replies {% if depth >= 6 %}flattened{% endif %}">
+    <div class="forum-nested-replies {% if depth >= 10 %}flattened{% endif %}">
       {% for reply in message.replies_list %}
         {% with next_depth=depth|add:1 %}
           {% include "forum/includes/message_node.html" with message=reply depth=next_depth %}
