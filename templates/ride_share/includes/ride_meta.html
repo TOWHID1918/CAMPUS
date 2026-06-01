@@ -3,8 +3,12 @@ Provides small meta row with departure, transport, occupancy
 {% endcomment %}
 <div class="ride-meta">
   <div class="detail-item">
+    <i class="fas fa-hashtag"></i>
+    <span>{% if post %}ID: {{ post.id }}{% elif ride_post %}ID: {{ ride_post.id }}{% endif %}</span>
+  </div>
+  <div class="detail-item">
     <i class="fas fa-clock"></i>
-    <span>{% if post %}{{ post.departure_time|date:"M d, Y H:i" }}{% elif ride_post %}{{ ride_post.departure_time|date:"M d, Y H:i" }}{% endif %}</span>
+    <span>{% if post %}{{ post.departure_time|date:"M d, Y g:i A" }}{% elif ride_post %}{{ ride_post.departure_time|date:"M d, Y g:i A" }}{% endif %}</span>
   </div>
   <div class="detail-item">
     <i class="fas fa-car"></i>

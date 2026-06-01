@@ -3,36 +3,64 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db import transaction
-from django.db.models import Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.contrib import messages
-from django.http import Http404
+from django.db.models import Prefetch
 
-from .models import RidePost, RideGroup, RideGroupMember, RideDirection, UIU_LOCATION
-from .forms import RidePostForm, ApproachRideForm
+from .models import RidePost, RideGroup, RideGroupMember, RideDirection, Location, UIU_LOCATION, RideMonitorRequest, RideMonitorMatch
+from .forms import RidePostForm, ApproachRideForm, RideMonitorRequestForm
+from . import matching
+from .signals import notify_join_request, notify_join_approved
 from apps.threads.models import Thread, ThreadParticipant
 from apps.common.choices import (
     RidePostStatus, RideGroupStatus, RideGroupMemberStatus,
     ThreadParticipantRole, ThreadVisibility, TransportMethod
 )
 
+
+def _expire_past_date_ride_posts():
+    """Soft-delete rides whose departure calendar date is already past and remove chat thread."""
+    today = timezone.localdate()
+    expired_posts = RidePost.objects.filter(
+        deleted_at__isnull=True,
+        departure_time__date__lt=today,
+    ).select_related('ride_group', 'ride_group__thread')
+
+    for post in expired_posts:
+        with transaction.atomic():
+            ride_group = getattr(post, 'ride_group', None)
+            if ride_group:
+                thread = ride_group.thread
+                if thread:
+                    ride_group.thread = None
+                    ride_group.save(update_fields=['thread', 'updated_at'])
+                    thread.delete()
+
+                if ride_group.status != RideGroupStatus.CANCELLED:
+                    ride_group.status = RideGroupStatus.CANCELLED
+                    ride_group.save(update_fields=['status', 'updated_at'])
+
+            post.soft_delete()
+
+
+def _is_past_date_ride(ride_post):
+    return ride_post.departure_time.date() < timezone.localdate()
+
 @login_required
 def all_rides(request):
     """Browse all active ride posts with N+1 query optimization"""
+    _expire_past_date_ride_posts()
     now = timezone.now()
+    Location.ensure_predefined_locations()
     
     # Using annotate to calculate occupancy in a single DB trip
     posts = RidePost.objects.filter(
         status=RidePostStatus.OPEN,
         deleted_at__isnull=True,
         expires_at__gt=now,
-    ).select_related('user', 'user__profile').annotate(
-        annotated_occupancy=Sum(
-            Coalesce('ride_group__members__party_size', Value(0)),
-            filter=Q(ride_group__members__status=RideGroupMemberStatus.CONFIRMED)
-        )
-    ).order_by('-created_at')
+        ride_group__status=RideGroupStatus.FORMING,
+    ).select_related('user', 'user__profile', 'starting_location', 'destination_location').order_by('-created_at')
     
     # Filter by direction if provided
     direction = request.GET.get('direction')
@@ -47,13 +75,21 @@ def all_rides(request):
     # Filter by starting location if provided
     location = request.GET.get('location')
     if location:
-        posts = posts.filter(starting_location__icontains=location)
+        posts = posts.filter(
+            Q(starting_location_id=location) | Q(destination_location_id=location)
+        )
+
+    locations = Location.objects.filter(is_active=True).order_by('name')
 
     context = {
         'posts': posts,
         'tab': 'all',
         'directions': RideDirection.choices,
         'transports': TransportMethod.choices,
+        'locations': locations,
+        'selected_direction': direction,
+        'selected_transport': transport,
+        'selected_location': location,
     }
     return render(request, 'ride_share/all_rides.html', context)
 
@@ -61,7 +97,17 @@ def all_rides(request):
 @login_required
 def approach_ride(request, pk):
     """User joins a ride post - Protected against Race Conditions"""
-    ride_post = get_object_or_404(RidePost, pk=pk)
+    _expire_past_date_ride_posts()
+    ride_post = get_object_or_404(
+        RidePost.objects.select_related('starting_location', 'destination_location'),
+        pk=pk,
+    )
+
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has expired and is no longer available.')
+        return redirect('ride_share:all_rides')
     
     # GET: Display the form to join the ride
     if request.method == 'GET':
@@ -97,6 +143,18 @@ def approach_ride(request, pk):
                     messages.warning(request, 'Your join request is already pending approval.')
                 elif existing.status == RideGroupMemberStatus.CONFIRMED:
                     messages.warning(request, 'You are already in this ride!')
+                elif existing.status == RideGroupMemberStatus.LEFT:
+                    remaining_seats = ride_group.max_capacity - ride_group.current_occupancy
+                    if party_size > remaining_seats:
+                        messages.error(request, f'Only {remaining_seats} seat(s) available. You requested {party_size}.')
+                        return redirect('ride_share:ride_detail', pk=pk)
+
+                    existing.party_size = party_size
+                    existing.status = RideGroupMemberStatus.PENDING
+                    existing.save(update_fields=['party_size', 'status', 'updated_at'])
+                    notify_join_request(existing)
+                    messages.success(request, 'Your rejoin request has been submitted. The organizer will review it.')
+                    return redirect('ride_share:ride_detail', pk=pk)
                 else:
                     messages.warning(request, 'You have an existing request for this ride.')
                 return redirect('ride_share:ride_detail', pk=pk)
@@ -107,12 +165,13 @@ def approach_ride(request, pk):
                 return redirect('ride_share:ride_detail', pk=pk)
 
             # Create a pending membership; organizer must approve to confirm and add to chat
-            RideGroupMember.objects.create(
+            member = RideGroupMember.objects.create(
                 group=ride_group,
                 user=request.user,
                 party_size=party_size,
                 status=RideGroupMemberStatus.PENDING
             )
+            notify_join_request(member)
 
         messages.success(request, 'Join request submitted. The organizer will review and approve your request.')
         return redirect('ride_share:ride_detail', pk=pk)
@@ -122,21 +181,39 @@ def approach_ride(request, pk):
 @require_POST
 def leave_ride(request, pk):
     """User leaves a ride and is safely removed from threads"""
+    _expire_past_date_ride_posts()
     ride_post = get_object_or_404(RidePost, pk=pk)
-    ride_group = get_object_or_404(RideGroup, ride_post=ride_post)
-    member = get_object_or_404(RideGroupMember, group=ride_group, user=request.user)
-    
-    if member.is_initiator and ride_group.status == RideGroupStatus.FORMING:
-        messages.error(request, "Ride organizer cannot leave a ride that hasn't started!")
-        return redirect('ride_share:ride_detail', pk=pk)
-    
-    # Remove from group
-    member.status = RideGroupMemberStatus.LEFT
-    member.save(update_fields=['status', 'updated_at'])
-    
-    # Remove from chat thread to secure privacy
-    if ride_group.thread:
-        ThreadParticipant.objects.filter(thread=ride_group.thread, user=request.user).delete()
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has already expired.')
+        return redirect('ride_share:my_matches')
+
+    with transaction.atomic():
+        ride_post = RidePost.objects.select_for_update().get(pk=ride_post.pk)
+        ride_group = RideGroup.objects.select_for_update().get(ride_post=ride_post)
+        member = get_object_or_404(RideGroupMember, group=ride_group, user=request.user)
+
+        if member.is_initiator and ride_group.status == RideGroupStatus.FORMING:
+            messages.error(request, "Ride organizer cannot leave a ride that hasn't started!")
+            return redirect('ride_share:ride_detail', pk=pk)
+
+        # Remove from group
+        member.status = RideGroupMemberStatus.LEFT
+        member.save(update_fields=['status', 'updated_at'])
+
+        # If a once-full, forming ride now has seats, make it discoverable again
+        if (
+            ride_group.status == RideGroupStatus.FORMING
+            and ride_post.status == RidePostStatus.CLOSED
+            and not ride_group.is_full
+        ):
+            ride_post.status = RidePostStatus.OPEN
+            ride_post.save(update_fields=['status', 'updated_at'])
+
+        # Remove from chat thread to secure privacy
+        if ride_group.thread:
+            ThreadParticipant.objects.filter(thread=ride_group.thread, user=request.user).delete()
     
     messages.success(request, 'You have left the ride.')
     return redirect('ride_share:my_matches')
@@ -145,25 +222,38 @@ def leave_ride(request, pk):
 @login_required
 def ride_detail(request, pk):
     """View details of a specific ride post"""
-    ride_post = get_object_or_404(RidePost, pk=pk)
+    _expire_past_date_ride_posts()
+    ride_post = (
+        RidePost.objects.select_related(
+            'starting_location',
+            'destination_location',
+            'user',
+            'user__profile',
+        ).filter(pk=pk).first()
+    )
+
+    if not ride_post:
+        messages.error(request, 'This ride post has been deleted.')
+        return redirect('ride_share:all_rides')
+
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has expired and was removed.')
+        return redirect('ride_share:all_rides')
     
     context = {
         'ride_post': ride_post,
-        'ride': ride_post,
         'ride_group': None,
-        'group': None,
         'members': [],
-        'is_member': False,
         'user_is_member': False,
         'is_initiator': False,
-        'member': None,
         'is_full': False,
     }
     
     # Get the ride group if it exists
     if hasattr(ride_post, 'ride_group'):
         group = ride_post.ride_group
-        context['group'] = group
         context['ride_group'] = group
         context['members'] = list(group.members.filter(status=RideGroupMemberStatus.CONFIRMED).select_related('user'))
         # Pending join requests for organizer review
@@ -186,10 +276,8 @@ def ride_detail(request, pk):
         # Check if user is a member
         try:
             member = group.members.get(user=request.user)
-            context['is_member'] = True
             context['user_is_member'] = True
             context['is_initiator'] = member.is_initiator
-            context['member'] = member
         except RideGroupMember.DoesNotExist:
             pass
     
@@ -199,6 +287,7 @@ def ride_detail(request, pk):
 @login_required
 def my_posts(request):
     """View user's own ride posts"""
+    _expire_past_date_ride_posts()
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'delete':
@@ -207,6 +296,15 @@ def my_posts(request):
                 post = RidePost.objects.get(pk=post_id, user=request.user)
             except RidePost.DoesNotExist:
                 messages.error(request, 'Ride not found or you are not the owner.')
+                return redirect('ride_share:my_posts')
+
+            has_other_confirmed_members = RideGroupMember.objects.filter(
+                group__ride_post=post,
+                status=RideGroupMemberStatus.CONFIRMED,
+            ).exclude(user=request.user).exists()
+
+            if has_other_confirmed_members:
+                messages.error(request, 'You cannot delete this ride because other members have already joined.')
                 return redirect('ride_share:my_posts')
 
             # Permanently remove associated thread (if any), then delete the post
@@ -230,9 +328,16 @@ def my_posts(request):
                     pass
                 messages.error(request, f'Failed to permanently delete ride: {e}. Post marked cancelled instead.')
             return redirect('ride_share:my_posts')
-            return redirect('ride_share:my_posts')
 
-    posts = RidePost.objects.filter(user=request.user).order_by('-created_at')
+    posts = RidePost.objects.filter(user=request.user).select_related(
+        'starting_location',
+        'destination_location',
+    ).annotate(
+        other_confirmed_member_count=Count(
+            'ride_group__members',
+            filter=Q(ride_group__members__status=RideGroupMemberStatus.CONFIRMED) & ~Q(ride_group__members__user=request.user),
+        )
+    ).order_by('-created_at')
     
     context = {
         'posts': posts,
@@ -244,8 +349,12 @@ def my_posts(request):
 @login_required
 def my_matches(request):
     """View user's joined/matched rides"""
+    _expire_past_date_ride_posts()
     memberships = RideGroupMember.objects.filter(user=request.user).select_related(
-        'group', 'group__ride_post'
+        'group',
+        'group__ride_post',
+        'group__ride_post__starting_location',
+        'group__ride_post__destination_location',
     ).order_by('-joined_at')
     
     confirmed_rides = []
@@ -259,29 +368,81 @@ def my_matches(request):
             confirmed_rides.append(group)
 
     pending_matches = [m for m in memberships if m.status == RideGroupMemberStatus.PENDING]
+    left_rides = [m for m in memberships if m.status == RideGroupMemberStatus.LEFT]
+
+    monitor_matches = RideMonitorMatch.objects.select_related(
+        'monitor_request',
+        'ride_post',
+        'ride_post__user',
+        'ride_post__user__profile',
+        'ride_post__starting_location',
+        'ride_post__destination_location',
+    ).filter(monitor_request__user=request.user).order_by('-matched_at')
+
+    monitor_requests = RideMonitorRequest.objects.filter(
+        user=request.user,
+        deleted_at__isnull=True,
+    ).prefetch_related(
+        Prefetch('matches', queryset=monitor_matches)
+    ).select_related(
+        'starting_location',
+        'destination_location',
+    ).order_by('-created_at')
     
     context = {
         'confirmed_rides': confirmed_rides,
         'pending_matches': pending_matches,
-        'memberships': memberships,
+        'left_rides': left_rides,
+        'monitor_requests': monitor_requests,
         'tab': 'my_matches',
     }
     return render(request, 'ride_share/my_matches.html', context)
 
 
 @login_required
+def request_ride(request):
+    """Create a ride monitor request instead of posting a ride directly."""
+    _expire_past_date_ride_posts()
+    Location.ensure_predefined_locations()
+
+    if request.method == 'POST':
+        form = RideMonitorRequestForm(request.POST)
+        if form.is_valid():
+            monitor_request = form.save(commit=False)
+            monitor_request.user = request.user
+            monitor_request.save()
+            try:
+                matching.process_new_monitor_request(monitor_request)
+            except Exception:
+                messages.warning(request, 'Your ride monitor was saved, but matching could not finish right now.')
+            messages.success(request, 'Your ride monitor is active. Matching rides will appear below.')
+            return redirect('ride_share:my_matches')
+    else:
+        initial = {
+            'direction': RideDirection.TO_UNIVERSITY,
+            'destination_location': UIU_LOCATION,
+        }
+        form = RideMonitorRequestForm(initial=initial)
+
+    locations = Location.objects.filter(is_active=True).order_by('name')
+    context = {
+        'form': form,
+        'locations': locations,
+        'UIU_LOCATION': UIU_LOCATION,
+    }
+    return render(request, 'ride_share/request_ride.html', context)
+
+
+@login_required
 def create_ride(request):
     """Create a new ride post"""
+    _expire_past_date_ride_posts()
+    Location.ensure_predefined_locations()
     if request.method == 'POST':
-        form = RidePostForm(request.POST)
+        form = RidePostForm(request.POST, user=request.user)
         if form.is_valid():
             ride_post = form.save(commit=False)
             ride_post.user = request.user
-            # Server-side: apply UIU defaults if user left fields blank
-            if ride_post.direction == RideDirection.TO_UNIVERSITY and not ride_post.destination_location:
-                ride_post.destination_location = UIU_LOCATION
-            if ride_post.direction == RideDirection.TO_HOME and not ride_post.starting_location:
-                ride_post.starting_location = UIU_LOCATION
             ride_post.save()
             
             # Create the ride group and thread
@@ -314,6 +475,11 @@ def create_ride(request):
                     user=request.user,
                     role=ThreadParticipantRole.AUTHOR
                 )
+
+            try:
+                matching.process_new_ride_post(ride_post)
+            except Exception:
+                messages.warning(request, 'Ride created, but matching could not finish right now.')
             
             messages.success(request, 'Ride created successfully!')
             return redirect('ride_share:ride_detail', pk=ride_post.pk)
@@ -323,23 +489,39 @@ def create_ride(request):
         # default direction is TO_UNIVERSITY; prefill destination with UIU when empty
         initial['direction'] = RideDirection.TO_UNIVERSITY
         initial['destination_location'] = UIU_LOCATION
-        form = RidePostForm(initial=initial)
+        form = RidePostForm(initial=initial, user=request.user)
 
-    context = {'form': form, 'UIU_LOCATION': UIU_LOCATION}
+    locations = Location.objects.filter(is_active=True).order_by('name')
+    context = {
+        'form': form,
+        'locations': locations,
+        'UIU_LOCATION': UIU_LOCATION,
+    }
     return render(request, 'ride_share/create_ride.html', context)
 
 
 @login_required
 def ride_chat(request, pk):
     """Redirect to thread chat for ride group - leverages threads app"""
-    ride_post = get_object_or_404(RidePost, pk=pk)
+    _expire_past_date_ride_posts()
+    ride_post = RidePost.objects.filter(pk=pk).first()
+
+    if not ride_post:
+        messages.error(request, 'This ride post has been deleted.')
+        return redirect('ride_share:all_rides')
+
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has expired. Chat is no longer available.')
+        return redirect('ride_share:all_rides')
+
     ride_group = get_object_or_404(RideGroup, ride_post=ride_post)
     
-    # Check if user is a member of the ride group
-    try:
-        ride_group.members.get(user=request.user)
-    except RideGroupMember.DoesNotExist:
-        messages.error(request, 'You are not a member of this ride.')
+    # Check if user is a confirmed member of the ride group
+    member = ride_group.members.filter(user=request.user).first()
+    if not member or member.status != RideGroupMemberStatus.CONFIRMED:
+        messages.error(request, 'You must be a confirmed member to access the chat. Please request to join the ride.')
         return redirect('ride_share:ride_detail', pk=pk)
     
     # Ensure thread exists
@@ -355,7 +537,14 @@ def ride_chat(request, pk):
 @require_POST
 def start_ride(request, pk):
     """Start a ride (organizer only)"""
+    _expire_past_date_ride_posts()
     ride_post = get_object_or_404(RidePost, pk=pk)
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has already expired.')
+        return redirect('ride_share:all_rides')
+
     ride_group = get_object_or_404(RideGroup, ride_post=ride_post)
     member = get_object_or_404(RideGroupMember, group=ride_group, user=request.user)
     
@@ -383,7 +572,14 @@ def start_ride(request, pk):
 @require_POST
 def approve_request(request, ride_pk, member_pk):
     """Organizer approves a pending join request"""
+    _expire_past_date_ride_posts()
     ride_post = get_object_or_404(RidePost, pk=ride_pk)
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has already expired.')
+        return redirect('ride_share:all_rides')
+
     if ride_post.user != request.user:
         messages.error(request, 'Only the organizer can approve requests.')
         return redirect('ride_share:ride_detail', pk=ride_pk)
@@ -406,6 +602,11 @@ def approve_request(request, ride_pk, member_pk):
 
         member.status = RideGroupMemberStatus.CONFIRMED
         member.save(update_fields=['status', 'updated_at'])
+        notify_join_approved(member)
+
+        if ride_group.is_full and ride_post.status == RidePostStatus.OPEN:
+            ride_post.status = RidePostStatus.CLOSED
+            ride_post.save(update_fields=['status', 'updated_at'])
 
         # create thread if missing
         if not ride_group.thread:
@@ -437,7 +638,13 @@ def approve_request(request, ride_pk, member_pk):
 @require_POST
 def reject_request(request, ride_pk, member_pk):
     """Organizer rejects a pending join request"""
+    _expire_past_date_ride_posts()
     ride_post = get_object_or_404(RidePost, pk=ride_pk)
+    if ride_post.deleted_at or _is_past_date_ride(ride_post):
+        if not ride_post.deleted_at:
+            ride_post.soft_delete()
+        messages.error(request, 'This ride has already expired.')
+        return redirect('ride_share:all_rides')
     if ride_post.user != request.user:
         messages.error(request, 'Only the organizer can reject requests.')
         return redirect('ride_share:ride_detail', pk=ride_pk)

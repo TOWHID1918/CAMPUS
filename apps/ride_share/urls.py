@@ -11,6 +11,7 @@ urlpatterns = [
     # User's posts and matches
     path('my-posts/', views.my_posts, name='my_posts'),
     path('my-matches/', views.my_matches, name='my_matches'),
+    path('request/', views.request_ride, name='request_ride'),
     
     # Create and join rides
     path('create/', views.create_ride, name='create_ride'),
