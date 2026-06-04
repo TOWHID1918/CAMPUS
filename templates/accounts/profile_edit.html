@@ -95,67 +95,29 @@
                 placeholder="Tell others a bit about yourself...">{{ profile.bio }}</textarea>
     </div>
 
-    {# ── Skills ──────────────────────────────────────────────── #}
+{# ── Skills ──────────────────────────────────────────────── #}
     <p class="form-section-title" style="margin-top: 24px;">Skills</p>
 
     <div class="form-group">
-      <label>Your skills</label>
-      <p class="form-help" style="margin-bottom: 8px;">
-        Select from the list below. Search to filter.
+      <p class="form-help" style="margin-bottom: 10px;">
+        Skills are managed on a separate page. You can add approved skills
+        directly or propose new ones for review.
       </p>
 
-      {# Selected chips + hidden inputs rendered here #}
-      <div class="selected-chips" id="e-selectedChips">
-        <span class="chips-placeholder" id="e-chipsPlaceholder"
-              {% if skills %}style="display:none"{% endif %}>
-          None selected — pick from below
-        </span>
-
-        {% for skill in skills %}
-          <span class="selected-chip" data-id="{{ skill.id }}">
-            {{ skill.name }}
-            <button class="chip-remove"
-                    type="button"
-                    onclick="removeSkill('{{ skill.id }}')">×</button>
-          </span>
-        {% endfor %}
-      </div>
-
-      {# Hidden inputs carry the values to the POST — managed by profile.js #}
-      <div id="skill-hidden-inputs">
-        {% for skill in skills %}
-          <input type="hidden" name="skill_ids" value="{{ skill.id }}">
-        {% endfor %}
-      </div>
-
-      {# Search input — visually attached to pool below via border-radius CSS #}
-      <input type="text"
-            id="e-skillSearch"
-            class="form-group input"
-            placeholder="Search skills..."
-            autocomplete="off"
-            style="margin-top: 10px; display: block; width: 100%;
-                    padding: 8px 11px; border: 1.5px solid var(--border-dark);
-                    border-radius: var(--radius) var(--radius) 0 0;
-                    font-family: inherit; font-size: 14px;
-                    outline: none; background: var(--surface); color: var(--text);
-                    border-bottom-color: var(--border);">
-
-      <div class="skills-pool" id="e-skillsPool">
-        {% for skill in all_skills %}
-          <div class="pool-item
-                      {% if skill.id in user_skill_ids %}pool-item--selected{% endif %}"
-              data-id="{{ skill.id }}"
-              data-name="{{ skill.name }}"
-              onclick="addSkill(this)"
-              {% if skill.id in user_skill_ids %}style="display:none"{% endif %}>
-            {{ skill.name }}
-          </div>
-        {% endfor %}
-        <div class="pool-empty" id="e-poolEmpty" style="display:none;">
-          No matching skills
+      {% if skills %}
+        <div class="skills-wrap" style="margin-bottom: 12px;">
+          {% for skill in skills %}
+            <span class="skill-tag">{{ skill.name }}</span>
+          {% endfor %}
         </div>
-      </div>
+      {% else %}
+        <p style="font-size:13px; color:var(--text-light); font-style:italic;
+                  margin-bottom: 12px;">No skills added yet.</p>
+      {% endif %}
+
+      <a href="{% url 'skill_exchange:add_skill' %}" class="btn btn--outline btn--sm">
+        Manage Skills →
+      </a>
     </div>
 
     {# ── Actions ─────────────────────────────────────────────── #}

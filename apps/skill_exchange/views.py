@@ -3,9 +3,15 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-
-from .forms import SkillExchangePostForm
-from .models import ExchangeMatch, ExchangePost, ExchangeSession
+from .forms import SkillExchangePostForm, AddExistingSkillForm, ProposeNewSkillForm
+from .models import ExchangeMatch, ExchangePost, ExchangeSession, SkillSubmission, UserSkill, Skill
+from apps.common.choices import (
+    ExchangeMatchStatus,
+    ExchangePostStatus,
+    ExchangeSessionStatus,
+    UserSkillStatus,
+    SkillStatus,
+)
 from .services import (
     create_exchange_post,
     delete_exchange_post,
@@ -13,18 +19,13 @@ from .services import (
     process_session_completion,
     save_session_feedback,
 )
-from apps.common.choices import (
-    ExchangeMatchStatus,
-    ExchangePostStatus,
-    ExchangeSessionStatus,
-)
+
 
 # --- POST MANAGEMENT ---
 
 
 @login_required
 def post_list(request):
-    """View your own posts and their status."""
     posts = ExchangePost.objects.filter(
         author=request.user,
         status=ExchangePostStatus.MATCHING,
@@ -34,7 +35,6 @@ def post_list(request):
 
 @login_required
 def post_create(request):
-    """Create a new post and trigger the matching engine."""
     if request.method == "POST":
         form = SkillExchangePostForm(request.POST, user=request.user)
         if form.is_valid():
@@ -55,10 +55,6 @@ def post_create(request):
 @login_required
 @require_POST
 def post_delete(request, post_id):
-    """
-    Rule 1: Posts are immutable. To change skills, the user must delete and
-    recreate. This also cleans up any pending matches.
-    """
     post = get_object_or_404(ExchangePost, pk=post_id, author=request.user)
     delete_exchange_post(post)
     messages.info(request, "Post deleted and pending matches removed.")
@@ -107,9 +103,8 @@ def session_list(request):
 @login_required
 @require_POST
 def match_confirm_decision(request, match_id):
-    """The Two-Way Handshake: delegate the decision logic to the service layer."""
     match = get_object_or_404(ExchangeMatch, pk=match_id)
-    action = request.POST.get("action")  # 'accepted' or 'rejected'
+    action = request.POST.get("action")
 
     result = process_match_decision(match, request.user, action)
 
@@ -127,7 +122,6 @@ def match_confirm_decision(request, match_id):
         messages.success(request, "Match confirmed! A new session has started.")
         return redirect("threads:thread_detail", thread_id=result["thread_id"])
 
-    # outcome == "pending" (waiting for the other user to accept)
     return redirect("skill_exchange:match_list")
 
 
@@ -159,7 +153,6 @@ def session_complete_decision(request, session_id):
 def submit_session_feedback(request, session_id):
     session = get_object_or_404(ExchangeSession, pk=session_id)
 
-    # Authorization: ensure the requester is a participant
     is_participant = (
         session.match.ex_p_a.author == request.user
         or session.match.ex_p_b.author == request.user
@@ -168,7 +161,6 @@ def submit_session_feedback(request, session_id):
         messages.error(request, "You are not a participant in this session.")
         return redirect("skill_exchange:session_list")
 
-    # Input validation
     try:
         rating = int(request.POST.get("rating"))
         if not (1 <= rating <= 10):
@@ -185,3 +177,99 @@ def submit_session_feedback(request, session_id):
 
     messages.success(request, "Your feedback has been saved securely!")
     return redirect("threads:thread_detail", thread_id=session.thread.id)
+
+
+# ── Skill management ──────────────────────────────────────────────────────────
+
+@login_required
+def add_skill(request):
+    user = request.user
+    existing_form = AddExistingSkillForm(user=user)
+    propose_form  = ProposeNewSkillForm()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add_existing':
+            existing_form = AddExistingSkillForm(request.POST, user=user)
+            if existing_form.is_valid():
+                d = existing_form.cleaned_data
+                UserSkill.objects.create(
+                    user               = user,
+                    skill              = d['skill'],
+                    proficiency_level  = int(d['proficiency_level']),
+                    proficiency_method = d.get('proficiency_method', ''),
+                    proficiency_notes  = d.get('proficiency_notes', ''),
+                    years_experience   = d.get('years_experience'),
+                    role               = 'both',
+                    status             = UserSkillStatus.APPROVED,
+                )
+                messages.success(
+                    request,
+                    f'✅ "{d["skill"].name}" has been added to your profile!'
+                )
+                return redirect('accounts:profile', handle=user.handle)
+
+        elif action == 'propose_new':
+            propose_form = ProposeNewSkillForm(request.POST)
+            if propose_form.is_valid():
+                d = propose_form.cleaned_data
+
+                # 1. Save the SkillSubmission
+                submission = propose_form.save(commit=False)
+                submission.submitted_by = user
+                submission.role = 'both'
+                submission.save()
+
+                # 2. Find or create the Skill in PENDING state
+                existing_skill = Skill.objects.filter(name__iexact=d['name']).first()
+                if existing_skill:
+                    skill = existing_skill
+                else:
+                    skill = Skill.objects.create(
+                        name        = d['name'],
+                        description = d.get('description', ''),
+                        status      = SkillStatus.PENDING,
+                    )
+
+                # 3. Create a PENDING UserSkill for admin to approve
+                UserSkill.objects.get_or_create(
+                    user  = user,
+                    skill = skill,
+                    defaults={
+                        'proficiency_level':  d.get('proficiency_level', 1),
+                        'proficiency_method': d.get('proficiency_method', ''),
+                        'proficiency_notes':  d.get('proficiency_notes', ''),
+                        'years_experience':   d.get('years_experience'),
+                        'role':               'both',
+                        'status':             UserSkillStatus.PENDING,
+                    }
+                )
+
+                messages.info(
+                    request,
+                    '📬 Your skill proposal has been submitted for review. '
+                    "It will appear on your profile once a moderator approves it."
+                )
+                return redirect('accounts:profile', handle=user.handle)
+
+    my_submissions = UserSkill.objects.filter(
+    user=user,
+    status=UserSkillStatus.PENDING
+    ).select_related('skill').order_by('-id')[:5]
+
+    return render(request, 'skill_exchange/add_skill.html', {
+        'existing_form':  existing_form,
+        'propose_form':   propose_form,
+        'my_submissions': my_submissions,
+    })
+
+
+@login_required
+@require_POST
+def remove_skill(request, userskill_id):
+    user_skill = get_object_or_404(UserSkill, id=userskill_id, user=request.user)
+    name = user_skill.skill.name
+    user_skill.delete()
+    messages.success(request, f'"{name}" removed from your profile.')
+    return redirect('accounts:profile', handle=request.user.handle)

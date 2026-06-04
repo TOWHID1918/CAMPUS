@@ -430,3 +430,216 @@
   .profile-info-row   { flex-wrap: wrap; }
   .profile-info-row .btn { margin-left: 0; margin-top: 10px; }
 }
+/* ── Skill card title row (view page) ──────────────────────── */
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* remove the margin-bottom from card-title when inside card-title-row */
+.card-title-row .card-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* ── Skill tag blocks (view page) ──────────────────────────── */
+.skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.skill-tag-block {
+  position: relative;
+  background: var(--orange-light);
+  border: 1px solid var(--orange-border);
+  border-radius: var(--radius-md);
+  padding: 10px 36px 10px 12px; /* right padding reserves space for × */
+  min-width: 140px;
+}
+
+.skill-tag-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+/* override the old inline .skill-tag inside a block */
+.skill-tag-block .skill-tag {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--orange-hover);
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.skill-role-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.skill-role--teach {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.skill-role--learn {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.skill-role--both {
+  background: var(--orange-light);
+  color: var(--orange);
+  border: 1px solid var(--orange-border);
+}
+
+.skill-tag-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.skill-proficiency { font-weight: 600; }
+.skill-exp         { color: var(--text-light); }
+
+/* Remove button on each skill block */
+.skill-remove-form {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+}
+
+.skill-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color .12s;
+  font-family: inherit;
+}
+
+.skill-remove-btn:hover { color: var(--orange); }
+
+/* Empty state */
+.skills-empty {
+  font-size: 13px;
+  color: var(--text-light);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.skills-empty a {
+  color: var(--orange);
+  font-style: normal;
+  font-weight: 500;
+  margin-left: 6px;
+  text-decoration: none;
+}
+
+.skills-empty a:hover { text-decoration: underline; }
+
+/* ── Pending submissions section (view page) ───────────────── */
+.submissions-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.submissions-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.submission-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.submission-row:last-child { border-bottom: none; }
+
+.submission-name {
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  min-width: 120px;
+}
+
+.submission-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.submission-row--pending .submission-badge {
+  background: #fef9c3;
+  color: #a16207;
+  border: 1px solid #fde68a;
+}
+
+.submission-row--approved .submission-badge {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.submission-row--rejected .submission-badge {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.submission-note {
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── form-label-optional helper (add_skill page) ───────────── */
+.form-label-optional {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-light);
+  margin-left: 4px;
+}
+
+/* ── form-error helper ─────────────────────────────────────── */
+.form-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 4px;
+}

@@ -12,8 +12,8 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Skill(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    status = models.CharField(
+    name        = models.CharField(max_length=100, unique=True)
+    status      = models.CharField(
         max_length=20, choices=SkillStatus.choices, default=SkillStatus.PENDING
     )
     description = models.TextField(null=True, blank=True)
@@ -23,12 +23,18 @@ class Skill(models.Model):
 
 
 class UserSkill(models.Model):
-    proficiency_level = models.PositiveSmallIntegerField(default=1)
+    ROLE_CHOICES = [
+        ('teach', 'Can Teach'),
+        ('learn', 'Wants to Learn'),
+        ('both',  'Teach & Learn'),
+    ]
+    proficiency_level  = models.PositiveSmallIntegerField(default=1)
     proficiency_method = models.CharField(max_length=100, null=True, blank=True)
-    proficiency_notes = models.TextField(null=True, blank=True)
-    years_experience = models.DecimalField(
+    proficiency_notes  = models.TextField(null=True, blank=True)
+    years_experience   = models.DecimalField(
         max_digits=4, decimal_places=1, null=True, blank=True
     )
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='both')
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -224,3 +230,66 @@ class SessionFeedback(models.Model):
 
     def __str__(self):
         return f"{self.rating}/10 for {self.rated_user.email}"
+
+class SkillSubmission(models.Model):
+    """
+    Holds a user's request to add a brand-new skill to the registry.
+    On admin approval:
+      1. A Skill is created (or existing one approved)
+      2. A UserSkill is auto-created for the submitter
+    """
+    STATUS_PENDING  = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES  = [
+        (STATUS_PENDING,  'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    submitted_by       = models.ForeignKey(
+                           settings.AUTH_USER_MODEL,
+                           on_delete=models.CASCADE,
+                           related_name='skill_submissions'
+                         )
+    # Proposed skill fields
+    name               = models.CharField(max_length=100)
+    description        = models.TextField(blank=True)
+    # Submitter's proficiency with this skill
+    proficiency_level  = models.PositiveSmallIntegerField(default=1)
+    proficiency_method = models.CharField(max_length=100, blank=True)
+    proficiency_notes  = models.TextField(blank=True)
+    years_experience   = models.DecimalField(
+                           max_digits=4, decimal_places=1, null=True, blank=True
+                         )
+    role               = models.CharField(max_length=10, default='both')
+    # Moderation
+    status             = models.CharField(
+                           max_length=20,
+                           choices=STATUS_CHOICES,
+                           default=STATUS_PENDING
+                         )
+    moderator_note     = models.TextField(
+                           blank=True,
+                           help_text="Reason for rejection — shown to the user"
+                         )
+    reviewed_by        = models.ForeignKey(
+                           settings.AUTH_USER_MODEL,
+                           null=True, blank=True,
+                           on_delete=models.SET_NULL,
+                           related_name='reviewed_skill_submissions'
+                         )
+    approved_skill     = models.ForeignKey(   # populated on approval
+                           Skill,
+                           null=True, blank=True,
+                           on_delete=models.SET_NULL,
+                           related_name='source_submissions'
+                         )
+    submitted_at       = models.DateTimeField(auto_now_add=True)
+    reviewed_at        = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+
+    def __str__(self):
+        return f'"{self.name}" by {self.submitted_by.email} [{self.status}]'

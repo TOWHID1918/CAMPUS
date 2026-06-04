@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.http import JsonResponse
 from .forms import RegisterForm
 from .models import UserProfile
-from apps.skill_exchange.models import UserSkill, Skill
+from apps.skill_exchange.models import UserSkill
+from apps.common.choices import UserSkillStatus
 from apps.academics.models import Department
 from apps.media.models import Photo
 
@@ -14,16 +15,27 @@ MAX_PHOTO_MB = 5
 
 def profile_view(request, handle):
     profile = get_object_or_404(UserProfile, user__handle=handle)
-    skills = UserSkill.objects.filter(user=profile.user).select_related("skill")
+    skills = UserSkill.objects.filter(
+        user=profile.user,
+        status=UserSkillStatus.APPROVED
+    ).select_related("skill")
     is_own_profile = request.user.is_authenticated and request.user.handle == handle
 
+    pending_submissions = []
+    if is_own_profile:
+        pending_submissions = UserSkill.objects.filter(
+            user=profile.user,
+            status=UserSkillStatus.PENDING
+       ).select_related('skill')
+        
     return render(
         request,
         "accounts/profile.html",
         {
             "profile": profile,
-            "skills": [us.skill for us in skills],
+            "skills": skills,
             "is_own_profile": is_own_profile,
+            "pending_submissions": pending_submissions,
         },
     )
 
@@ -39,14 +51,16 @@ def edit_profile(request, handle):
 
     # Shared context for both GET and a failed POST re-render
     def get_form_context():
-        skills = UserSkill.objects.filter(user=user).select_related("skill")
+        skills = UserSkill.objects.filter(
+            user=user,
+            status=UserSkillStatus.APPROVED
+        ).select_related("skill")
         return {
             "profile": profile,
-            "skills": [us.skill for us in skills],
+            "skills": [us.skill for us in skills],  # edit page only needs names
             "all_departments": Department.objects.all().order_by("name"),
-            "all_skills": Skill.objects.all().order_by("name"),
-            "user_skill_ids": list(skills.values_list("skill_id", flat=True)),
         }
+            
 
     if request.method == "GET":
         return render(request, "accounts/profile_edit.html", get_form_context())
@@ -102,13 +116,7 @@ def edit_profile(request, handle):
     profile.save(update_fields=["bio", "student_id", "department", "photo"])
 
     # ── Skills ───────────────────────────────────────────────────────────
-    skill_ids = request.POST.getlist("skill_ids")
-    UserSkill.objects.filter(user=user).delete()
-    if skill_ids:
-        valid_skills = Skill.objects.filter(id__in=skill_ids)
-        UserSkill.objects.bulk_create(
-            [UserSkill(user=user, skill=skill) for skill in valid_skills]
-        )
+    
 
     # TODO — Notification hook:
     # If profile verification status changed or XP-granting actions happened,
