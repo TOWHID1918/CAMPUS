@@ -29,14 +29,14 @@
 }
 
 .forum-message-box:hover {
-  border-color: var(--border-dark);
+  border-color: var(--orange);
 }
 
 /* Indented container for all nested child nodes */
 .forum-nested-replies {
   margin-top: 8px;
-  margin-left: 24px;
-  padding-left: 12px;
+  
+  padding-left: clamp(8px, 2vw, 20px);
   border-left: 2px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -46,7 +46,7 @@
 
 /* Change thread-line highlight on hover */
 .forum-nested-replies:hover {
-  border-left-color: var(--orange-border);
+  border-left-color: var(--orange);
 }
 
 /* Stop indenting after depth 6 */
@@ -133,7 +133,7 @@
 }
 
 .forum-message-header {
-  display: flex;
+  
   align-items: baseline;
   gap: 8px;
   margin-bottom: 4px;
@@ -167,13 +167,13 @@
 .forum-message--self {
     background-color: var(--orange-light);
     border: 1px solid var(--orange-border);
-    border-left: 3px solid var(--orange); /* Thicker accent bar on the left */
+    border-left: 3px solid var(--border-dark); /* Thicker accent bar on the left */
 }
 
 /* Ensure dark mode handles the custom background gracefully if needed */
 [data-theme="dark"] .forum-message--self {
     background-color: rgba(244, 121, 32, 0.05); /* Highly transparent orange tint */
-    border-color: rgba(244, 121, 32, 0.2);
+    
 }
 
 /* Styling for the small '(You)' indicator */

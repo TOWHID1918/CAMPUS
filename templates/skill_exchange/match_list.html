@@ -1,5 +1,5 @@
 {% extends "skill_exchange/base.html" %}
-
+{% load static %}
 {% block content %}
 
 <div class="campus-header">
@@ -35,20 +35,18 @@
                             </div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-                            <div class="status-indicators" style="margin-top: 10px;">
+                        <div class="sx-match-bottom-row">
+                            <div class="status-indicators">
                                 {% if match.ex_p_a.author == request.user %}
-                                    {# I am User A #}
-                                    You: <span class="badge {% if match.user_a_accepted %}badge--active{% endif %}">{% if match.user_a_accepted %}Accepted{% else %}Pending{% endif %}</span>
-                                    Partner: <span class="badge {% if match.user_b_accepted %}badge--active{% endif %}">{% if match.user_b_accepted %}Accepted{% else %}Pending{% endif %}</span>
+                                    <span class="status-row">You: <span class="badge {% if match.user_a_accepted %}badge--active{% endif %}">{% if match.user_a_accepted %}Accepted{% else %}Pending{% endif %}</span></span>
+                                    <span class="status-row">Partner: <span class="badge {% if match.user_b_accepted %}badge--active{% endif %}">{% if match.user_b_accepted %}Accepted{% else %}Pending{% endif %}</span></span>
                                 {% else %}
-                                    {# I am User B #}
-                                    You: <span class="badge {% if match.user_b_accepted %}badge--active{% endif %}">{% if match.user_b_accepted %}Accepted{% else %}Pending{% endif %}</span>
-                                    Partner: <span class="badge {% if match.user_a_accepted %}badge--active{% endif %}">{% if match.user_a_accepted %}Accepted{% else %}Pending{% endif %}</span>
+                                    <span class="status-row">You: <span class="badge {% if match.user_b_accepted %}badge--active{% endif %}">{% if match.user_b_accepted %}Accepted{% else %}Pending{% endif %}</span></span>
+                                    <span class="status-row">Partner: <span class="badge {% if match.user_a_accepted %}badge--active{% endif %}">{% if match.user_a_accepted %}Accepted{% else %}Pending{% endif %}</span></span>
                                 {% endif %}
                             </div>
 
-                            <div class="actions" style="margin-top: 15px;">
+                            <div class="actions">
                                 {# Only show buttons if I haven't accepted yet #}
                                 {% if match.ex_p_a.author == request.user and not match.user_a_accepted or match.ex_p_b.author == request.user and not match.user_b_accepted %}
                                     <form method="POST" action="{% url 'skill_exchange:match_confirm_decision' match.id %}">
@@ -63,11 +61,19 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div style="margin-top: 12px;">
-                            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5;">
-                                Message from <a href="{% url 'accounts:profile' handle=match.user_context.partner_user.handle %}">@{{ match.user_context.partner_user.handle }}</a> : {{ match.user_context.partner_post.description }}
+
+                        {# ── Partner message with See more/less ── #}
+                        <div class="sx-partner-message-wrap">
+                            <p>
+                                Message from <a href="{% url 'accounts:profile' handle=match.user_context.partner_user.handle %}">@{{ match.user_context.partner_user.handle }}</a> :
+                                <span class="sx-partner-message-text">{{ match.user_context.partner_post.description }}</span>
                             </p>
+                            <button class="sx-see-more-btn" type="button">
+                                <span class="sx-see-more-label">See more</span>
+                                <span class="sx-see-more-icon">▾</span>
+                            </button>
                         </div>
+
                     </div>
                 </div>
             {% endfor %}
@@ -77,4 +83,8 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'skill_exchange/js/see-more.js' %}"></script>
 {% endblock %}

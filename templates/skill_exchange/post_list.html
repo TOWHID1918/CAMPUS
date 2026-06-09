@@ -1,4 +1,5 @@
 {% extends "skill_exchange/base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="campus-header">
@@ -14,41 +15,60 @@
     <div class="card__body">
         {% if posts %}
             {% for post in posts %}
-                <div class="card sx-match-card" style="border: 1px solid var(--border);">
+                <div class="card sx-match-card">
                     <div class="card__body">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                            <div>
+
+                        {# ── Header: status + delete ── #}
+                        <div class="sx-post-header">
+                            <div class="sx-post-header__left">
                                 <span class="badge {% if post.status == 'matching' %}badge--active{% else %}badge--muted{% endif %}">
                                     {{ post.get_status_display }}
                                 </span>
-                                <small style="color: var(--text-muted); margin-left: 8px;">Created {{ post.created_at|date:"M d, Y" }}</small>
+                                <small class="sx-post-date">Created {{ post.created_at|date:"M d, Y" }}</small>
                             </div>
-                            
-                            <form method="POST" action="{% url 'skill_exchange:post_delete' post.id %}" onsubmit="return confirm('Are you sure? This will remove all pending matches for this post.');">
+                            <form method="POST" action="{% url 'skill_exchange:post_delete' post.id %}"
+                                  onsubmit="return confirm('Are you sure? This will remove all pending matches for this post.');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn--outline btn--sm" style="color: var(--red); border-color: var(--red-light);">Delete</button>
+                                <button type="submit" class="btn btn--outline btn--sm sx-delete-btn">Delete</button>
                             </form>
                         </div>
 
-                        <div style="margin-bottom: 12px;">
-                            <div class="sx-user-label">Offering</div>
-                            {% for skill in post.skills_offered.all %}
-                                <span class="sx-skill-tag">{{ skill.name }}</span>
-                            {% endfor %}
+                        {# ── Skills ── #}
+                        <div class="sx-post-skills">
+                            <div class="sx-post-skill-group">
+                                <div class="sx-user-label">Offering</div>
+                                <div class="sx-post-tags">
+                                    {% for skill in post.skills_offered.all %}
+                                        <span class="sx-skill-tag">{{ skill.name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="sx-post-skill-divider">⇄</div>
+
+                            <div class="sx-post-skill-group sx-post-skill-group--right">
+                                <div class="sx-user-label">Seeking</div>
+                                <div class="sx-post-tags">
+                                    {% for skill in post.skills_needed.all %}
+                                        <span class="sx-skill-tag sx-skill-tag--needed">{{ skill.name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
 
-                        <div style="margin-bottom: 12px;">
-                            <div class="sx-user-label">Seeking</div>
-                            {% for skill in post.skills_needed.all %}
-                                <span class="sx-skill-tag sx-skill-tag--needed">{{ skill.name }}</span>
-                            {% endfor %}
-                        </div>
-
+                        {# ── Description with See more ── #}
                         {% if post.description %}
-                            <p style="font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-top: 12px; border-top: 1px solid var(--bg); padding-top: 12px;">
-                                {{ post.description }}
-                            </p>
+                            <div class="sx-partner-message-wrap sx-see-more-wrap">
+                                <p>
+                                    <span class="sx-partner-message-text sx-see-more-text">{{ post.description }}</span>
+                                </p>
+                                <button class="sx-see-more-btn" type="button">
+                                    <span class="sx-see-more-label">See more</span>
+                                    <span class="sx-see-more-icon">▾</span>
+                                </button>
+                            </div>
                         {% endif %}
+
                     </div>
                 </div>
             {% endfor %}
@@ -60,4 +80,11 @@
         {% endif %}
     </div>
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script src="{% static 'skill_exchange/js/see-more.js' %}"></script>
+
 {% endblock %}
