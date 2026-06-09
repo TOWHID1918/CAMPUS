@@ -1,0 +1,22 @@
+  <section class="forum-search-container">
+    <div class="search-bar-wrapper">
+      <div class="search-input-group">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="fuzzy-search-input" placeholder="Search Departments (e.g. CSE) or Courses (e.g. 101)..." autocomplete="off">
+        <div id="search-suggestions-box" class="search-suggestions-dropdown" style="display: none;"></div>
+      </div>
+    </div>
+
+    <div class="active-filters-row mt-12">
+      {% if active_filters %}
+        <span class="text-small text-muted mr-8">Filtering by:</span>
+        {% for filter in active_filters %}
+          <div class="filter-chip">
+            <span class="chip-label">{{ filter.label }}</span>
+            <a href="{{ filter.remove_url }}" class="chip-remove">×</a>
+          </div>
+        {% endfor %}
+        <a href="{% url 'forum:public_threads' %}" class="btn-clear-all">Clear All</a>
+      {% endif %}
+    </div>
+  </section>

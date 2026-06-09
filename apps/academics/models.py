@@ -1,11 +1,10 @@
 from django.db import models
-from django.conf import settings
 from django.core.exceptions import ValidationError
 
 
 class Department(models.Model):
-    name = models.CharField(max_length=100)
-    short_code = models.CharField(max_length=10, unique=True)
+    name = models.CharField(max_length=100, db_index=True)
+    short_code = models.CharField(max_length=10, unique=True, db_index=True)
 
     def save(self, *args, **kwargs):
         self.short_code = self.short_code.upper()
@@ -16,8 +15,8 @@ class Department(models.Model):
 
 
 class Course(models.Model):
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=100, db_index=True)
+    code = models.CharField(max_length=20, unique=True, db_index=True)
     department = models.ForeignKey(
         Department, on_delete=models.CASCADE, related_name="courses"
     )

@@ -31,7 +31,7 @@ class User(AbstractUser):
     username = None
 
     email = models.EmailField(unique=True)
-    handle = models.CharField(max_length=50, unique=True)
+    handle = models.CharField(max_length=50, unique=True, db_index=True)
 
     first_name = models.CharField(max_length=150, blank=False)
     last_name = models.CharField(max_length=150, blank=False)

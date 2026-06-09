@@ -1,60 +1,132 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import transaction
+from django.core.paginator import Paginator
 from django.db.models import F, Q
 from django.http import JsonResponse
+from django.urls import reverse
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from apps.academics.models import Trimester, Department, Course
-from apps.common.choices import ThreadVisibility, VoteType
-from apps.forum.forms import ForumThreadCreateForm, ThreadMessageForm
-from apps.forum.models import ForumThread
-from apps.threads.models import MessageVote, ThreadMessage
+from apps.accounts.models import User
+from apps.academics.models import Department, Course
+from apps.common.choices import ThreadVisibility
 
-
-def get_current_trimester():
-    """Helper to fetch the current active trimester."""
-    return Trimester.objects.order_by("-code").first()
+from .forms import ForumThreadCreateForm, ThreadMessageForm
+from .filters import ForumThreadFilter
+from .models import ForumThread, ForumThreadFollower
+from .services import (
+    get_current_trimester,
+    create_forum_thread,
+    create_thread_message,
+    toggle_exclusive_message_pin,
+    toggle_message_vote,
+    toggle_thread_follow,
+    build_active_filters,
+    apply_forum_thread_filters,
+)
 
 
 @login_required
-def forum_index(request):
+def public_threads(request):
     """List and filter forum threads with active filter context."""
-    threads = (
+    threads_qs = (
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
         )
-        .filter(
-            Q(thread__visibility=ThreadVisibility.PUBLIC)
-            | Q(thread__participants__user=request.user)
-        )
+        .filter(Q(thread__visibility=ThreadVisibility.PUBLIC))
         .distinct()
         .order_by("-thread__created_at")
     )
 
-    dept_code = request.GET.get("department")
-    course_code = request.GET.get("course")
+    filterset = ForumThreadFilter(request.GET, queryset=threads_qs)
 
-    active_filters = []
+    # Build active_filters for the chip UI from the validated filterset data
+    active_filters = build_active_filters(filterset)
 
-    if dept_code:
-        threads = threads.filter(department__short_code=dept_code)
-        dept_obj = Department.objects.filter(short_code=dept_code).first()
-        if dept_obj:
-            active_filters.append({"type": "dept", "label": dept_obj.name})
-
-    if course_code:
-        threads = threads.filter(course__code=course_code)
-        course_obj = Course.objects.filter(code=course_code).first()
-        if course_obj:
-            active_filters.append({"type": "course", "label": course_obj.name})
+    paginator = Paginator(filterset.qs, 20)
+    page = paginator.get_page(request.GET.get("page"))
 
     context = {
-        "threads": threads,
+        "threads": page,
         "active_filters": active_filters,
+        "filterset": filterset,
     }
-    return render(request, "forum/index.html", context)
+    return render(request, "forum/public_threads.html", context)
+
+
+@login_required
+def announcement_threads(request):
+    """List all announcement threads."""
+    threads = (
+        ForumThread.objects.select_related(
+            "thread", "author", "course", "department", "trimester"
+        )
+        .filter(thread__visibility=ThreadVisibility.PUBLIC, is_announcement=True)
+        .order_by("-thread__created_at")
+    )
+    return render(request, "forum/announcement_threads.html", {"threads": threads})
+
+
+@login_required
+def my_threads(request):
+    """List threads created by the current user."""
+    threads = (
+        ForumThread.objects.select_related(
+            "thread", "author", "course", "department", "trimester"
+        )
+        .filter(author=request.user)
+        .order_by("-thread__created_at")
+    )
+
+    filter_dept_code = request.GET.get("department")
+    filter_course_code = request.GET.get("course")
+
+    threads, active_filters = apply_forum_thread_filters(
+        threads,
+        department_code=filter_dept_code,
+        course_code=filter_course_code,
+    )
+
+    return render(
+        request,
+        "forum/my_threads.html",
+        {"threads": threads, "active_filters": active_filters},
+    )
+
+
+@login_required
+def my_participating_threads(request):
+    """List threads where the user is a participant (but not the author)."""
+    threads = (
+        ForumThread.objects.select_related(
+            "thread", "author", "course", "department", "trimester"
+        )
+        .filter(thread__participants__user=request.user)
+        .exclude(author=request.user)
+        .distinct()
+        .order_by("-thread__created_at")
+    )
+    return render(request, "forum/my_participating_threads.html", {"threads": threads})
+
+
+@login_required
+def my_following_threads(request):
+    followed = (
+        ForumThreadFollower.objects.filter(user=request.user)
+        .select_related(
+            "forum_thread__thread",
+            "forum_thread__author",
+            "forum_thread__course",
+            "forum_thread__department",
+        )
+        .order_by("-followed_at")
+    )
+    return render(
+        request,
+        "forum/my_following_threads.html",
+        {"followed_threads": followed},
+    )
 
 
 @login_required
@@ -62,27 +134,37 @@ def search_suggestions(request):
     """API endpoint for fuzzy searching departments and courses."""
     q = request.GET.get("q", "").strip()
     if len(q) < 2:
-        return JsonResponse({"departments": [], "courses": []})
+        return JsonResponse({"departments": [], "courses": [], "users": []})
 
-    # Fuzzy match on short_code or name
-    depts = Department.objects.filter(
+    result_depts = Department.objects.filter(
         Q(short_code__icontains=q) | Q(name__icontains=q)
     ).distinct()[:5]
 
-    # Fuzzy match on course code or name
-    courses = Course.objects.filter(
+    result_courses = Course.objects.filter(
         Q(code__icontains=q) | Q(name__icontains=q)
+    ).distinct()[:5]
+
+    result_users = User.objects.filter(
+        Q(handle__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q)
     ).distinct()[:5]
 
     return JsonResponse(
         {
             "departments": [
                 {"id": d.id, "label": f"{d.short_code}: {d.name}", "code": d.short_code}
-                for d in depts
+                for d in result_depts
             ],
             "courses": [
                 {"id": c.id, "label": f"{c.code}: {c.name}", "code": c.code}
-                for c in courses
+                for c in result_courses
+            ],
+            "users": [
+                {
+                    "id": u.id,
+                    "label": f"{u.get_full_name()} ({u.handle})",
+                    "handle": u.handle,
+                }
+                for u in result_users
             ],
         }
     )
@@ -94,13 +176,26 @@ def thread_create(request):
     current_trimester = get_current_trimester()
 
     if request.method == "POST":
-        form = ForumThreadCreateForm(request.POST, request.FILES, user=request.user)
+        form = ForumThreadCreateForm(request.POST, user=request.user)
         if form.is_valid():
-            forum_thread = form.save(current_trimester=current_trimester)
+            # Delegate creation and notifications directly to the service layer
+            forum_thread = create_forum_thread(
+                user=request.user,
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                department=form.cleaned_data["department"],
+                course=form.cleaned_data["course"],
+                current_trimester=current_trimester,
+                participants_list=form.cleaned_data["participants"],
+                is_announcement=form.cleaned_data["is_announcement"],
+            )
+            messages.success(request, "Thread created successfully.")
             return redirect("forum:thread_detail", pk=forum_thread.pk)
+        for _, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, str(error))
     else:
         form = ForumThreadCreateForm(user=request.user)
-
     context = {"form": form}
     return render(request, "forum/thread_create.html", context)
 
@@ -119,23 +214,28 @@ def thread_detail(request, pk):
     # Enforce private thread authorization
     if base_thread.visibility == ThreadVisibility.PRIVATE:
         is_participant = base_thread.participants.filter(user=request.user).exists()
-        if not is_participant and forum_thread.author != request.user:
+        if not is_participant:
             messages.error(request, "You are not a participant in this thread.")
-            return redirect("forum:index")
+            return redirect("forum:public_threads")
 
     # Process new reply submission
     if request.method == "POST":
         form = ThreadMessageForm(request.POST, request.FILES)
         if form.is_valid():
-            reply_to_id = request.POST.get("reply_to")
-            reply_to = None
-            if reply_to_id:
-                reply_to = get_object_or_404(
-                    ThreadMessage, pk=reply_to_id, thread=base_thread
-                )
-
-            form.save(thread=base_thread, sender=request.user, reply_to=reply_to)
-            return redirect("forum:thread_detail", pk=pk)
+            # Delegate all validation lookup, file saving, and side-effects to service layer
+            thread_message = create_thread_message(
+                sender=request.user,
+                forum_thread=forum_thread,
+                content=form.cleaned_data["content"],
+                uploaded_photos=form.cleaned_data.get("uploaded_photos"),
+                reply_to_id=request.POST.get("reply_to"),
+            )
+            messages.success(request, "Your reply has been posted successfully.")
+            redirect_url = (
+                reverse("forum:thread_detail", args=[pk])
+                + f"#message-{thread_message.id}"
+            )
+            return redirect(redirect_url)
     else:
         form = ThreadMessageForm()
 
@@ -176,6 +276,10 @@ def thread_detail(request, pk):
         else:
             root_thread_messages.append(msg)
 
+    is_following = ForumThreadFollower.objects.filter(
+        user=request.user, forum_thread=forum_thread
+    ).exists()
+
     context = {
         "forum_thread": forum_thread,
         "base_thread": base_thread,
@@ -183,87 +287,63 @@ def thread_detail(request, pk):
         "pinned_answer": pinned_answer,
         "form": form,
         "current_sort": sort_option,
+        "is_following": is_following,
     }
     return render(request, "forum/thread_detail.html", context)
 
 
 @login_required
 @require_POST
-def toggle_message_pin(request, message_id):
-    # 1. Fetch thread message and the associated ForumThread
-    thread_message = get_object_or_404(ThreadMessage, pk=message_id)
+def pin_message(request, message_id):
     try:
-        forum_thread = thread_message.thread.forumthread
-    except ForumThread.DoesNotExist:
-        return JsonResponse({"error": "Forum thread not found"}, status=404)
+        # Delegate data fetching, uniqueness validation, and notifications to the service
+        _, action = toggle_exclusive_message_pin(
+            user=request.user, message_id=message_id
+        )
+        messages.success(request, f"Message has been {action} successfully.")
+        return JsonResponse({"status": "success", "action": action})
 
-    # 2. Permission Check: Only the thread author can pin
-    if forum_thread.author != request.user:
-        return JsonResponse({"error": "Only the author can mark an answer"}, status=403)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=404)
 
-    with transaction.atomic():
-        if thread_message.is_pinned:
-            # Unpin current
-            thread_message.is_pinned = False
-            thread_message.save()
-            action = "unpinned"
-        else:
-            # 3. Enforce Exclusivity: Unpin all other messages in this thread
-            ThreadMessage.objects.filter(
-                thread=thread_message.thread, is_pinned=True
-            ).update(is_pinned=False)
-
-            # Pin the new one
-            thread_message.is_pinned = True
-            thread_message.save()
-            action = "pinned"
-
-    return JsonResponse({"status": "success", "action": action})
+    except PermissionDenied as e:
+        return JsonResponse({"error": str(e)}, status=403)
 
 
-@require_POST
 @login_required
+@require_POST
 def vote_message(request, message_id):
-    """Handle upvoting and downvoting on a thread message."""
-    thread_message = get_object_or_404(ThreadMessage, pk=message_id)
-    vote_type_param = request.POST.get("vote_type")  # 'upvote' or 'downvote'
+    """API endpoint to handle upvoting and downvoting on a thread message."""
+    vote_type_param = request.POST.get("vote_type")
 
-    if vote_type_param not in ["upvote", "downvote"]:
-        return JsonResponse({"error": "Invalid vote type."}, status=400)
-
-    target_vote_type = (
-        VoteType.UPVOTE if vote_type_param == "upvote" else VoteType.DOWNVOTE
-    )
-
-    with transaction.atomic():
-        # Lock the thread message row to prevent race conditions updating counts
-        thread_message = ThreadMessage.objects.select_for_update().get(pk=message_id)
-        vote, created = MessageVote.objects.get_or_create(
-            message=thread_message,
-            user=request.user,
-            defaults={"vote_type": target_vote_type},
+    try:
+        # Delegate the locking, logic, and math to the service
+        upvotes, downvotes = toggle_message_vote(
+            user=request.user, message_id=message_id, vote_type_str=vote_type_param
         )
 
-        if not created:
-            if vote.vote_type == target_vote_type:
-                # Clicking the same vote twice revokes it
-                vote.delete()
-            else:
-                # Switching vote type
-                vote.vote_type = target_vote_type
-                vote.save()
+        return JsonResponse(
+            {
+                "upvote_count": upvotes,
+                "downvote_count": downvotes,
+            }
+        )
 
-        # Recalculate accurate counts dynamically
-        upvotes = thread_message.votes.filter(vote_type=VoteType.UPVOTE).count()
-        downvotes = thread_message.votes.filter(vote_type=VoteType.DOWNVOTE).count()
+    except ValueError as e:
+        # Catch our validation error and return a 400 Bad Request
+        return JsonResponse({"error": str(e)}, status=400)
 
-        thread_message.upvote_count = upvotes
-        thread_message.downvote_count = downvotes
-        thread_message.save(update_fields=["upvote_count", "downvote_count"])
 
-    return JsonResponse(
-        {
-            "upvote_count": upvotes,
-            "downvote_count": downvotes,
-        }
+@login_required
+@require_POST
+def follow_thread(request, pk):
+    is_following = toggle_thread_follow(user=request.user, forum_thread_id=pk)
+    messages.success(
+        request,
+        (
+            "You are now following this thread."
+            if is_following
+            else "You have unfollowed this thread."
+        ),
     )
+    return JsonResponse({"is_following": is_following})

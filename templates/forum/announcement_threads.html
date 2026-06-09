@@ -1,0 +1,73 @@
+{% extends "forum/base.html" %}
+{% load static %}
+
+{% block title %}Campus Forum{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'forum/css/index.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="campus-wrap">
+  <header class="campus-header">
+    <div class="campus-header__row">
+      <div>
+        <h1>Announcements</h1>
+        <p>Important announcements from the administration.</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="forum-threads-list">
+    
+    {% for f_thread in threads %}
+      <article class="card">
+        <div class="card__header">
+          <a href="{% url 'forum:thread_detail' f_thread.pk %}" class="card__title">
+            {{ f_thread.title }}
+          </a>
+          <div>
+            {% if f_thread.thread.visibility == 'public' %}
+              <span class="badge badge--found">Public</span>
+            {% else %}
+              <span class="badge badge--pending">Private</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card__body">
+          <p class="text-muted text-small">
+            {{ f_thread.thread.description|truncatewords:25 }}
+          </p>
+        </div>
+
+        <div class="card__footer">
+          <div class="card__meta">
+            <span class="card__meta-item">
+              👤 <strong>{{ f_thread.author.handle|default:f_thread.author.email }}</strong>
+            </span>
+            {% if f_thread.department %}
+              <span class="card__meta-item">🏛 {{ f_thread.department.short_code }}</span>
+            {% endif %}
+            {% if f_thread.course %}
+              <span class="card__meta-item">📚 {{ f_thread.course.name }}</span>
+            {% endif %}
+            <span class="card__meta-item text-light">
+              🕒 {{ f_thread.thread.created_at|date:"M d, Y" }}
+            </span>
+          </div>
+          <div>
+            <a href="{% url 'forum:thread_detail' f_thread.pk %}" class="btn btn--ghost btn--sm">
+              View Discussion →
+            </a>
+          </div>
+        </div>
+      </article>
+    {% empty %}
+      <div class="empty">
+        <p>No public announcements available.</p>
+      </div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

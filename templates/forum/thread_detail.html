@@ -10,16 +10,29 @@
 {% block content %}
 <div class="campus-wrap">
   <div class="mb-16">
-    <a href="{% url 'forum:index' %}" class="btn btn--ghost btn--sm">← Back to Forum</a>
+    <a href="{% url 'forum:public_threads' %}" class="btn btn--ghost btn--sm">← Back to Forum</a>
   </div>
 
   <section class="card mb-24 forum-thread-main">
     <div class="card__header">
-      <h1 class="card__title" style="font-size: 20px;">{{ base_thread.title }}</h1>
-      <div>
+      <h1 class="card__title" style="font-size: 20px;">{{ forum_thread.title }}</h1>
+
+      {# ── Right-side controls: visibility badge + follow button ── #}
+      <div class="flex items-center flex-gap-8">
         <span class="badge {% if base_thread.visibility == 'public' %}badge--found{% else %}badge--pending{% endif %}">
           {{ base_thread.visibility|title }}
         </span>
+
+        {# Follow button — state driven by is_following passed from the view #}
+        <button
+          id="follow-btn"
+          class="btn btn--sm {% if is_following %}btn--ghost{% else %}btn--outline{% endif %}"
+          data-thread-pk="{{ forum_thread.pk }}"
+          data-following="{{ is_following|yesno:'true,false' }}"
+        >
+          {% if is_following %}✓ Following{% else %}+ Follow{% endif %}
+        </button>
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
       </div>
     </div>
 
@@ -29,9 +42,12 @@
           <strong>{{ forum_thread.author.handle|default:forum_thread.author.email }}</strong>
         </a>
       </span>
-      <span class="card__meta-item">
-        📚 {{ forum_thread.department.short_code }} - {{ forum_thread.course.name }}
-      </span>
+      {% if forum_thread.department %}
+        <span class="card__meta-item">🏛 {{ forum_thread.department.short_code }}</span>
+      {% endif %}
+      {% if forum_thread.course %}
+        <span class="card__meta-item">📚 {{ forum_thread.course.name }}</span>
+      {% endif %}
       <span class="card__meta-item text-light">
         🕒 {{ base_thread.created_at|date:"M d, Y h:i A" }}
       </span>

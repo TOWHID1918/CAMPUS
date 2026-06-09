@@ -12,8 +12,8 @@
   <header class="campus-header">
     <div class="campus-header__row">
       <div>
-        <h1>University Forum</h1>
-        <p>Discuss courses, collaborate on assignments, and ask questions.</p>
+        <h1>My Threads</h1>
+        <p>Forum threads you've created.</p>
       </div>
       <a href="{% url 'forum:thread_create' %}" class="btn btn--primary">
         + Open Thread
@@ -21,28 +21,7 @@
     </div>
   </header>
 
-  <section class="forum-search-container">
-    <div class="search-bar-wrapper">
-      <div class="search-input-group">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="fuzzy-search-input" placeholder="Search Departments (e.g. CSE) or Courses (e.g. 101)..." autocomplete="off">
-        <div id="search-suggestions-box" class="search-suggestions-dropdown" style="display: none;"></div>
-      </div>
-    </div>
-
-    <div class="active-filters-row mt-12" id="active-filters-container">
-      {% if active_filters %}
-        <span class="text-small text-muted mr-8">Filtering by:</span>
-        {% for filter in active_filters %}
-          <div class="filter-chip">
-            <span class="chip-label">{{ filter.label }}</span>
-            <a href="?{% if filter.type == 'dept' %}{% if request.GET.course %}course={{ request.GET.course }}{% endif %}{% else %}{% if request.GET.department %}department={{ request.GET.department }}{% endif %}{% endif %}" class="chip-remove">×</a>
-          </div>
-        {% endfor %}
-        <a href="{% url 'forum:index' %}" class="btn-clear-all">Clear All</a>
-      {% endif %}
-    </div>
-  </section>
+  {% include "forum/includes/search_box.html" with active_filters=active_filters %}
 
   <section class="forum-threads-list">
     
@@ -50,8 +29,7 @@
       <article class="card">
         <div class="card__header">
           <a href="{% url 'forum:thread_detail' f_thread.pk %}" class="card__title">
-            {% if f_thread.is_pinned %}📌 {% endif %}
-            {{ f_thread.thread.title }}
+            {{ f_thread.title }}
           </a>
           <div>
             {% if f_thread.thread.visibility == 'public' %}
@@ -73,9 +51,12 @@
             <span class="card__meta-item">
               👤 <strong>{{ f_thread.author.handle|default:f_thread.author.email }}</strong>
             </span>
-            <span class="card__meta-item">
-              🏛️ {{ f_thread.department.short_code }} | {{ f_thread.course.name }}
-            </span>
+            {% if f_thread.department %}
+              <span class="card__meta-item">🏛 {{ f_thread.department.short_code }}</span>
+            {% endif %}
+            {% if f_thread.course %}
+              <span class="card__meta-item">📚 {{ f_thread.course.name }}</span>
+            {% endif %}
             <span class="card__meta-item text-light">
               🕒 {{ f_thread.thread.created_at|date:"M d, Y" }}
             </span>
@@ -89,8 +70,8 @@
       </article>
     {% empty %}
       <div class="empty">
-        <p>No forum threads found matching your criteria.</p>
-        <a href="{% url 'forum:thread_create' %}" class="btn btn--outline mt-8">Start the first thread</a>
+        <p>You have not created any forum threads yet.</p>
+        <a href="{% url 'forum:thread_create' %}" class="btn btn--outline mt-8">Start your first thread</a>
       </div>
     {% endfor %}
   </section>

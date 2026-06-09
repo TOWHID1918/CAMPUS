@@ -85,7 +85,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- 3. Pinning / Mark as Best Answer Logic ---
+  // --- 3. Follow / Unfollow Thread ---
+  const followBtn = document.getElementById('follow-btn');
+  if (followBtn) {
+    followBtn.addEventListener('click', async () => {
+      const pk = followBtn.dataset.threadPk;
+      followBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/forum/${pk}/follow/`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+        });
+        const data = await res.json();
+
+        if (data.is_following) {
+          followBtn.textContent = '✓ Following';
+          followBtn.classList.replace('btn--outline', 'btn--ghost');
+          followBtn.dataset.following = 'true';
+        } else {
+          followBtn.textContent = '+ Follow';
+          followBtn.classList.replace('btn--ghost', 'btn--outline');
+          followBtn.dataset.following = 'false';
+        }
+        
+        window.location.reload(); 
+      } catch (err) {
+        console.error('Follow toggle failed:', err);
+      } finally {
+        followBtn.disabled = false;
+      }
+    });
+  }
+
+  // --- 4. Pinning / Mark as Best Answer Logic ---
   document.addEventListener('click', async (e) => {
     const pinBtn = e.target.closest('.btn-pin-message');
     if (!pinBtn) return;

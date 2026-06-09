@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.academics.apps.AcademicsConfig",
     "apps.skill_exchange.apps.SkillExchangeConfig",
     "apps.notifications.apps.NotificationsConfig",
+    "django_filters",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
