@@ -21,10 +21,12 @@ already available — signals fire before M2M is committed.
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.urls import reverse
 
-from .models import LostAndFoundPost
+from .models import LostAndFoundPost, SuggestedMatch
 from .matching import run_auto_match
 from apps.common.choices import LostAndFoundStatus
+from apps.notifications.signals import notify
 
 
 @receiver(post_save, sender=LostAndFoundPost)
@@ -45,6 +47,22 @@ def auto_match_on_approval(sender, instance, created, update_fields, **kwargs):
     if instance.status == LostAndFoundStatus.ACTIVE and not instance.deleted_at:
         suggestions = run_auto_match(instance)
 
-        # TODO — Notification hook for admin-approved posts:
-        # for suggestion in suggestions:
-        #     notify_user(recipient=suggestion.lost_post.user, verb="suggested_match", target=suggestion)
+
+@receiver(post_save, sender=SuggestedMatch)
+def notify_on_suggested_match(sender, instance, created, **kwargs):
+    """Notify the lost post owner when a new suggested match is found."""
+    if not created:
+        return
+
+    # Notify the owner of the lost post
+    notify(
+        recipient=instance.lost_post.user,
+        verb=f"Potential match for '{instance.lost_post.title}'",
+        target=instance,
+        data={
+            "url": reverse("lost_found:my_suggested_matches"),
+            "lost_post_id": instance.lost_post.id,
+            "found_post_id": instance.found_post.id,
+            "match_score": instance.score,
+        },
+    )
