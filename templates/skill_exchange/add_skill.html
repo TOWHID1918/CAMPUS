@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add a Skill{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'accounts/css/profile.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="campus-wrap" style="max-width: 680px;">
+
+  {# ── Header ───────────────────────────────────────────────── #}
+  <div class="campus-header">
+    <div class="campus-header__row">
+      <div>
+        <h1>Add a Skill</h1>
+        <p>Pick an approved skill or propose a new one for review.</p>
+      </div>
+      <a href="{% url 'accounts:myself' %}" class="btn btn--ghost btn--sm">
+        ← Back to Profile
+      </a>
+    </div>
+  </div>
+
+  {# ── Pending submissions tracker ──────────────────────────── #}
+  {% if my_submissions %}
+    <div class="info-card full" style="margin-bottom: 16px;">
+      <p class="card-title">Your Recent Proposals</p>
+   {% for sub in my_submissions %}
+   <div class="submission-row submission-row--{{ sub.status }}">
+    <span class="submission-name">{{ sub.skill.name }}</span>
+    <span class="submission-badge">Pending Review</span>
+   </div>
+   {% endfor %}
+    </div>
+  {% endif %}
+
+  {# ── Path 1: Add an existing approved skill ───────────────── #}
+  <div class="info-card full" style="margin-bottom: 16px;">
+    <p class="card-title">Add an Existing Skill</p>
+    <p class="form-help" style="margin-bottom: 16px;">
+      These skills are already approved. They'll be added to your profile immediately.
+    </p>
+
+    <form method="post" action="{% url 'skill_exchange:add_skill' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_existing">
+
+      {# Non-field errors #}
+      {% if existing_form.non_field_errors %}
+        <div class="message message--error" style="margin-bottom: 12px;">
+          {% for error in existing_form.non_field_errors %}
+            {{ error }}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# Skill dropdown #}
+      <div class="form-group">
+        <label for="{{ existing_form.skill.id_for_label }}">Skill</label>
+        {{ existing_form.skill }}
+        {% if existing_form.skill.errors %}
+          <p class="form-error">{{ existing_form.skill.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      {# Proficiency level — full width, role removed #}
+      <div class="form-group">
+        <label for="{{ existing_form.proficiency_level.id_for_label }}">
+          Proficiency Level
+        </label>
+        {{ existing_form.proficiency_level }}
+        {% if existing_form.proficiency_level.errors %}
+          <p class="form-error">{{ existing_form.proficiency_level.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      {# Optional fields #}
+      <div class="form-group">
+        <label for="{{ existing_form.proficiency_method.id_for_label }}">
+          How did you learn it?
+          <span class="form-label-optional">optional</span>
+        </label>
+        {{ existing_form.proficiency_method }}
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label for="{{ existing_form.years_experience.id_for_label }}">
+            Years of Experience
+            <span class="form-label-optional">optional</span>
+          </label>
+          {{ existing_form.years_experience }}
+        </div>
+        <div class="form-group">
+          <label for="{{ existing_form.proficiency_notes.id_for_label }}">
+            Notes
+            <span class="form-label-optional">optional</span>
+          </label>
+          {{ existing_form.proficiency_notes }}
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn--primary">Add to My Profile</button>
+    </form>
+  </div>
+
+  {# ── Path 2: Propose a new skill ──────────────────────────── #}
+  <div class="info-card full">
+    <p class="card-title">Propose a New Skill</p>
+    <p class="form-help" style="margin-bottom: 16px;">
+      Can't find your skill above? Propose it here. A moderator will review
+      it and add it to your profile once approved.
+    </p>
+
+    <form method="post" action="{% url 'skill_exchange:add_skill' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="propose_new">
+
+      {# Non-field errors #}
+      {% if propose_form.non_field_errors %}
+        <div class="message message--error" style="margin-bottom: 12px;">
+          {% for error in propose_form.non_field_errors %}
+            {{ error }}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# Skill name — full width, category removed #}
+      <div class="form-group">
+        <label for="{{ propose_form.name.id_for_label }}">Skill Name</label>
+        {{ propose_form.name }}
+        {% if propose_form.name.errors %}
+          <p class="form-error">{{ propose_form.name.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      {# Description #}
+      <div class="form-group">
+        <label for="{{ propose_form.description.id_for_label }}">
+          Description
+          <span class="form-label-optional">optional</span>
+        </label>
+        {{ propose_form.description }}
+      </div>
+
+      {# Proficiency level — full width, role removed #}
+      <div class="form-group">
+        <label for="{{ propose_form.proficiency_level.id_for_label }}">
+          Your Proficiency Level
+        </label>
+        {{ propose_form.proficiency_level }}
+        {% if propose_form.proficiency_level.errors %}
+          <p class="form-error">{{ propose_form.proficiency_level.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      {# Optional proficiency details #}
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label for="{{ propose_form.proficiency_method.id_for_label }}">
+            How did you learn it?
+            <span class="form-label-optional">optional</span>
+          </label>
+          {{ propose_form.proficiency_method }}
+        </div>
+        <div class="form-group">
+          <label for="{{ propose_form.years_experience.id_for_label }}">
+            Years of Experience
+            <span class="form-label-optional">optional</span>
+          </label>
+          {{ propose_form.years_experience }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ propose_form.proficiency_notes.id_for_label }}">
+          Additional Notes
+          <span class="form-label-optional">optional</span>
+        </label>
+        {{ propose_form.proficiency_notes }}
+      </div>
+
+      <button type="submit" class="btn btn--primary">Submit for Review</button>
+    </form>
+  </div>
+
+</div>
+
+{% endblock %}

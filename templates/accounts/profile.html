@@ -146,16 +146,65 @@
 
   {# Skills #}
   <div class="info-card full">
-    <p class="card-title">Skills</p>
-    <div class="skills-wrap">
-      {% if skills %}
-        {% for skill in skills %}
-          <span class="skill-tag">{{ skill.name }}</span>
-        {% endfor %}
-      {% else %}
-        <span class="skill-tag empty-msg">No skills added yet.</span>
+    <div class="card-title-row">
+      <p class="card-title">Skills</p>
+      {% if is_own_profile %}
+        <a href="{% url 'skill_exchange:add_skill' %}" class="btn btn--outline btn--sm">+ Add Skill</a>
       {% endif %}
     </div>
+
+    <div class="skills-wrap">
+      {% if skills %}
+        {% for us in skills %}
+          <div class="skill-tag-block">
+
+            <div class="skill-tag-top">
+          <span class="skill-tag">{{ us.skill.name }}</span>
+            </div>
+
+            <div class="skill-tag-meta">
+              <span class="skill-proficiency">Level {{ us.proficiency_level }}</span>
+              {% if us.years_experience %}
+                <span class="skill-exp">· {{ us.years_experience }}yr exp</span>
+              {% endif %}
+              {% if us.proficiency_method %}
+                <span class="skill-exp">· {{ us.proficiency_method }}</span>
+              {% endif %}
+            </div>
+
+            {% if is_own_profile %}
+              <form method="post"
+                    action="{% url 'skill_exchange:remove_skill' us.id %}"
+                    class="skill-remove-form">
+                {% csrf_token %}
+                <button type="submit" class="skill-remove-btn" title="Remove skill">×</button>
+              </form>
+            {% endif %}
+
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="skills-empty">
+          No skills added yet.
+          {% if is_own_profile %}
+            <a href="{% url 'skill_exchange:add_skill' %}">Add your first skill →</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    </div>
+
+    {% if is_own_profile and pending_submissions %}
+  <div class="submissions-section">
+    <p class="submissions-title">Pending Proposals</p>
+    {% for sub in pending_submissions %}
+      <div class="submission-row submission-row--pending">
+        <span class="submission-name">{{ sub.skill.name }}</span>
+         <span class="submission-badge">Pending Review</span>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
   </div>
 
 </div>
