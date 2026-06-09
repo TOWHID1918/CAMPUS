@@ -16,7 +16,7 @@
     <div class="campus-header__row">
       <div>
         <h1>Add a Skill</h1>
-        <p>Pick an approved skill or propose a new one for review.</p>
+        <p>Pick a verified skill or propose a new one for review.</p>
       </div>
       <a href="{% url 'accounts:myself' %}" class="btn btn--ghost btn--sm">
         ← Back to Profile
@@ -24,38 +24,16 @@
     </div>
   </div>
 
-  {# ── Pending submissions tracker ──────────────────────────── #}
-  {% if my_submissions %}
-    <div class="info-card full" style="margin-bottom: 16px;">
-      <p class="card-title">Your Recent Proposals</p>
-   {% for sub in my_submissions %}
-   <div class="submission-row submission-row--{{ sub.status }}">
-    <span class="submission-name">{{ sub.skill.name }}</span>
-    <span class="submission-badge">Pending Review</span>
-   </div>
-   {% endfor %}
-    </div>
-  {% endif %}
-
-  {# ── Path 1: Add an existing approved skill ───────────────── #}
+  {# ── Path 1: Add an existing verified skill ───────────────── #}
   <div class="info-card full" style="margin-bottom: 16px;">
     <p class="card-title">Add an Existing Skill</p>
     <p class="form-help" style="margin-bottom: 16px;">
-      These skills are already approved. They'll be added to your profile immediately.
+      These skills are verified. Adding a skill will create a pending request that a moderator must verify before it appears on your public profile.
     </p>
 
     <form method="post" action="{% url 'skill_exchange:add_skill' %}" novalidate>
       {% csrf_token %}
       <input type="hidden" name="action" value="add_existing">
-
-      {# Non-field errors #}
-      {% if existing_form.non_field_errors %}
-        <div class="message message--error" style="margin-bottom: 12px;">
-          {% for error in existing_form.non_field_errors %}
-            {{ error }}
-          {% endfor %}
-        </div>
-      {% endif %}
 
       {# Skill dropdown #}
       <div class="form-group">
@@ -112,21 +90,12 @@
     <p class="card-title">Propose a New Skill</p>
     <p class="form-help" style="margin-bottom: 16px;">
       Can't find your skill above? Propose it here. A moderator will review
-      it and add it to your profile once approved.
+      it and add it to your profile once verified.
     </p>
 
     <form method="post" action="{% url 'skill_exchange:add_skill' %}" novalidate>
       {% csrf_token %}
       <input type="hidden" name="action" value="propose_new">
-
-      {# Non-field errors #}
-      {% if propose_form.non_field_errors %}
-        <div class="message message--error" style="margin-bottom: 12px;">
-          {% for error in propose_form.non_field_errors %}
-            {{ error }}
-          {% endfor %}
-        </div>
-      {% endif %}
 
       {# Skill name — full width, category removed #}
       <div class="form-group">

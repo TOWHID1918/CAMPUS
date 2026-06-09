@@ -400,3 +400,106 @@ def update_user_sx_rating(rated_user) -> None:
 
         profile.sx_rating_avg = round(weighted_score, 1)
         profile.save(update_fields=["sx_rating_avg"])
+
+
+# ---------------------------------------------------------------------------
+# Skill Management Services
+# ---------------------------------------------------------------------------
+
+
+def add_existing_skill_to_profile(
+    user,
+    skill,
+    proficiency_level,
+    proficiency_method,
+    proficiency_notes,
+    years_experience,
+) -> dict:
+    """
+    Adds a verified skill to a user's profile with PENDING status.
+    Handles race conditions via get_or_create with unique constraint.
+
+    Returns:
+      {"success": True, "user_skill": UserSkill}
+      {"success": False, "error": str}
+    """
+    from .models import UserSkill
+    from apps.common.choices import UserSkillStatus
+
+    with transaction.atomic():
+        try:
+            user_skill, created = UserSkill.objects.get_or_create(
+                user=user,
+                skill=skill,
+                defaults={
+                    "proficiency_level": proficiency_level,
+                    "proficiency_method": proficiency_method or "",
+                    "proficiency_notes": proficiency_notes or "",
+                    "years_experience": years_experience,
+                    "status": UserSkillStatus.PENDING,
+                },
+            )
+            if not created:
+                return {
+                    "success": False,
+                    "error": f'"{skill.name}" is already on your profile.',
+                }
+            return {"success": True, "user_skill": user_skill}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to add skill: {str(e)}"}
+
+
+def propose_new_skill(
+    user,
+    name,
+    description,
+    proficiency_level,
+    proficiency_method,
+    proficiency_notes,
+    years_experience,
+) -> dict:
+    """
+    Proposes a new skill and adds it to the user's profile with PENDING status.
+    Uses get_or_create for the Skill to handle concurrent proposals safely.
+
+    Returns:
+      {"success": True, "skill": Skill, "user_skill": UserSkill}
+      {"success": False, "error": str}
+    """
+    from .models import Skill, UserSkill
+    from apps.common.choices import SkillStatus, UserSkillStatus
+
+    with transaction.atomic():
+        try:
+            # get_or_create handles race condition: if two users propose the same skill
+            # simultaneously, only one Skill record is created
+            skill, skill_created = Skill.objects.get_or_create(
+                name=name,
+                defaults={
+                    "description": description or "",
+                    "status": SkillStatus.PENDING,
+                },
+            )
+
+            # Now create the UserSkill linking this user to the skill (PENDING)
+            user_skill, userskill_created = UserSkill.objects.get_or_create(
+                user=user,
+                skill=skill,
+                defaults={
+                    "proficiency_level": proficiency_level,
+                    "proficiency_method": proficiency_method or "",
+                    "proficiency_notes": proficiency_notes or "",
+                    "years_experience": years_experience,
+                    "status": UserSkillStatus.PENDING,
+                },
+            )
+
+            if not userskill_created:
+                return {
+                    "success": False,
+                    "error": f'You already have a request to add "{skill.name}".',
+                }
+
+            return {"success": True, "skill": skill, "user_skill": user_skill}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to propose skill: {str(e)}"}

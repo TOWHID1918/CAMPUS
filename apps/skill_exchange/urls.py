@@ -1,8 +1,7 @@
 from django.urls import path
 
 from . import views
-path("skills/add/",                       views.add_skill,    name="add_skill"),
-path("skills/remove/<int:userskill_id>/", views.remove_skill, name="remove_skill"),
+
 app_name = "skill_exchange"
 
 urlpatterns = [
@@ -26,6 +25,6 @@ urlpatterns = [
         views.submit_session_feedback,
         name="submit_session_feedback",
     ),
-    path("skills/add/", views.add_skill, name="add_skill"),                          
-    path("skills/remove/<int:userskill_id>/", views.remove_skill, name="remove_skill"),  
+    path("skills/add/", views.add_skill, name="add_skill"),
+    path("skills/remove/<int:userskill_id>/", views.remove_skill, name="remove_skill"),
 ]

@@ -4,13 +4,16 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from .forms import SkillExchangePostForm, AddExistingSkillForm, ProposeNewSkillForm
-from .models import ExchangeMatch, ExchangePost, ExchangeSession, SkillSubmission, UserSkill, Skill
+from .models import (
+    ExchangeMatch,
+    ExchangePost,
+    ExchangeSession,
+    UserSkill,
+)
 from apps.common.choices import (
     ExchangeMatchStatus,
     ExchangePostStatus,
     ExchangeSessionStatus,
-    UserSkillStatus,
-    SkillStatus,
 )
 from .services import (
     create_exchange_post,
@@ -18,8 +21,9 @@ from .services import (
     process_match_decision,
     process_session_completion,
     save_session_feedback,
+    add_existing_skill_to_profile,
+    propose_new_skill,
 )
-
 
 # --- POST MANAGEMENT ---
 
@@ -41,11 +45,9 @@ def post_create(request):
             create_exchange_post(request.user, form)
             messages.success(request, "Exchange post created successfully!")
             return redirect("skill_exchange:post_list")
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    if field == "__all__":
-                        messages.error(request, error)
+        for _, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, str(error))
     else:
         form = SkillExchangePostForm(user=request.user)
 
@@ -181,88 +183,76 @@ def submit_session_feedback(request, session_id):
 
 # ── Skill management ──────────────────────────────────────────────────────────
 
+
 @login_required
 def add_skill(request):
     user = request.user
     existing_form = AddExistingSkillForm(user=user)
-    propose_form  = ProposeNewSkillForm()
+    propose_form = ProposeNewSkillForm(user=user)
 
-    if request.method == 'POST':
-        action = request.POST.get('action')
+    if request.method == "POST":
+        action = request.POST.get("action")
 
-        if action == 'add_existing':
+        if action == "add_existing":
             existing_form = AddExistingSkillForm(request.POST, user=user)
             if existing_form.is_valid():
                 d = existing_form.cleaned_data
-                UserSkill.objects.create(
-                    user               = user,
-                    skill              = d['skill'],
-                    proficiency_level  = int(d['proficiency_level']),
-                    proficiency_method = d.get('proficiency_method', ''),
-                    proficiency_notes  = d.get('proficiency_notes', ''),
-                    years_experience   = d.get('years_experience'),
-                    role               = 'both',
-                    status             = UserSkillStatus.APPROVED,
+                result = add_existing_skill_to_profile(
+                    user=user,
+                    skill=d["skill"],
+                    proficiency_level=int(d["proficiency_level"]),
+                    proficiency_method=d.get("proficiency_method", ""),
+                    proficiency_notes=d.get("proficiency_notes", ""),
+                    years_experience=d.get("years_experience"),
                 )
-                messages.success(
-                    request,
-                    f'✅ "{d["skill"].name}" has been added to your profile!'
-                )
-                return redirect('accounts:profile', handle=user.handle)
+                if result["success"]:
+                    messages.info(
+                        request,
+                        f'📬 A request to add "{d["skill"].name}" has been submitted and is pending verification.',
+                    )
+                    return redirect("accounts:profile", handle=user.handle)
+                else:
+                    messages.error(request, result["error"])
+            else:
+                # Display non-field errors as messages (field errors shown by template)
+                for error in existing_form.non_field_errors():
+                    messages.error(request, str(error))
 
-        elif action == 'propose_new':
-            propose_form = ProposeNewSkillForm(request.POST)
+        elif action == "propose_new":
+            propose_form = ProposeNewSkillForm(request.POST, user=user)
             if propose_form.is_valid():
                 d = propose_form.cleaned_data
-
-                # 1. Save the SkillSubmission
-                submission = propose_form.save(commit=False)
-                submission.submitted_by = user
-                submission.role = 'both'
-                submission.save()
-
-                # 2. Find or create the Skill in PENDING state
-                existing_skill = Skill.objects.filter(name__iexact=d['name']).first()
-                if existing_skill:
-                    skill = existing_skill
-                else:
-                    skill = Skill.objects.create(
-                        name        = d['name'],
-                        description = d.get('description', ''),
-                        status      = SkillStatus.PENDING,
+                result = propose_new_skill(
+                    user=user,
+                    name=d["name"],
+                    description=d.get("description", ""),
+                    proficiency_level=int(d.get("proficiency_level", 1)),
+                    proficiency_method=d.get("proficiency_method", ""),
+                    proficiency_notes=d.get("proficiency_notes", ""),
+                    years_experience=d.get("years_experience"),
+                )
+                if result["success"]:
+                    messages.info(
+                        request,
+                        "📬 Your skill proposal has been submitted for review. "
+                        "It will appear on your profile once a moderator verifies it.",
                     )
+                    return redirect("accounts:profile", handle=user.handle)
+                else:
+                    messages.error(request, result["error"])
+            else:
+                # Display non-field errors as messages (field errors shown by template)
+                for error in propose_form.non_field_errors():
+                    messages.error(request, str(error))
 
-                # 3. Create a PENDING UserSkill for admin to approve
-                UserSkill.objects.get_or_create(
-                    user  = user,
-                    skill = skill,
-                    defaults={
-                        'proficiency_level':  d.get('proficiency_level', 1),
-                        'proficiency_method': d.get('proficiency_method', ''),
-                        'proficiency_notes':  d.get('proficiency_notes', ''),
-                        'years_experience':   d.get('years_experience'),
-                        'role':               'both',
-                        'status':             UserSkillStatus.PENDING,
-                    }
-                )
-
-                messages.info(
-                    request,
-                    '📬 Your skill proposal has been submitted for review. '
-                    "It will appear on your profile once a moderator approves it."
-                )
-                return redirect('accounts:profile', handle=user.handle)
-
-    my_submissions = UserSkill.objects.filter(
-    user=user,
-    status=UserSkillStatus.PENDING
-    ).select_related('skill').order_by('-id')[:5]
-
-    return render(request, 'skill_exchange/add_skill.html', {
-        'existing_form':  existing_form,
-        'propose_form':   propose_form,
-        'my_submissions': my_submissions,
-    })
+    return render(
+        request,
+        "skill_exchange/add_skill.html",
+        {
+            "existing_form": existing_form,
+            "propose_form": propose_form,
+        },
+    )
 
 
 @login_required
@@ -272,4 +262,4 @@ def remove_skill(request, userskill_id):
     name = user_skill.skill.name
     user_skill.delete()
     messages.success(request, f'"{name}" removed from your profile.')
-    return redirect('accounts:profile', handle=request.user.handle)
+    return redirect("accounts:profile", handle=request.user.handle)

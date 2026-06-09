@@ -16,18 +16,16 @@ MAX_PHOTO_MB = 5
 def profile_view(request, handle):
     profile = get_object_or_404(UserProfile, user__handle=handle)
     skills = UserSkill.objects.filter(
-        user=profile.user,
-        status=UserSkillStatus.APPROVED
+        user=profile.user, status=UserSkillStatus.VERIFIED
     ).select_related("skill")
     is_own_profile = request.user.is_authenticated and request.user.handle == handle
 
     pending_submissions = []
     if is_own_profile:
         pending_submissions = UserSkill.objects.filter(
-            user=profile.user,
-            status=UserSkillStatus.PENDING
-       ).select_related('skill')
-        
+            user=profile.user, status=UserSkillStatus.PENDING
+        ).select_related("skill")
+
     return render(
         request,
         "accounts/profile.html",
@@ -52,15 +50,13 @@ def edit_profile(request, handle):
     # Shared context for both GET and a failed POST re-render
     def get_form_context():
         skills = UserSkill.objects.filter(
-            user=user,
-            status=UserSkillStatus.APPROVED
+            user=user, status=UserSkillStatus.VERIFIED
         ).select_related("skill")
         return {
             "profile": profile,
             "skills": [us.skill for us in skills],  # edit page only needs names
             "all_departments": Department.objects.all().order_by("name"),
         }
-            
 
     if request.method == "GET":
         return render(request, "accounts/profile_edit.html", get_form_context())
@@ -116,7 +112,6 @@ def edit_profile(request, handle):
     profile.save(update_fields=["bio", "student_id", "department", "photo"])
 
     # ── Skills ───────────────────────────────────────────────────────────
-    
 
     # TODO — Notification hook:
     # If profile verification status changed or XP-granting actions happened,
