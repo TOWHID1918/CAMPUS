@@ -1,0 +1,68 @@
+/* Prevent text selection while dragging the image */
+#lightbox {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#lightbox-img {
+  cursor: zoom-in;
+  /* transition is handled by JS for smooth zooming vs instant dragging */
+}
+
+/* When zoomed in but not actively dragging */
+#lightbox-img.is-zoomed {
+  cursor: grab;
+}
+
+/* When actively holding the mouse button down */
+#lightbox-img.is-dragging {
+  cursor: grabbing;
+  transition: none !important; /* Force instant 1:1 movement with mouse */
+}
+
+/* Close Button (Updated to match your right-side preference) */
+.lightbox-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: rgba(0, 0, 0, 0);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10000;
+  transition: background 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+/* Download Button (Placed next to the close button) */
+.lightbox-download {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10000;
+  transition: background 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(4px);
+  text-decoration: none; /* Prevents underline since it's an <a> tag */
+}
+
+.lightbox-close:hover,
+.lightbox-download:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}

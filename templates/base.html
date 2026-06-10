@@ -9,6 +9,13 @@
   {# Global design system — variables, reset, all shared components #}
   <link rel="stylesheet" href="{% static 'css/campus.css' %}">
   <link rel="stylesheet" href="{% static 'notifications/css/drawer.css' %}">
+  
+  {# Lightbox CSS #}
+  <link rel="stylesheet" href="{% static 'css/lightbox.css' %}">
+
+  {# Code Formatter CSS #}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="stylesheet" href="{% static 'css/code-formatter.css' %}">
 
   {# App-specific CSS (each app's base or template overrides this block) #}
   {% block extra_css %}{% endblock %}
@@ -161,7 +168,21 @@
   {# ── Scripts ──────────────────────────────────────────────── #}
   <script src="{% static 'js/campus.js' %}"></script>
   <script src="{% static 'notifications/js/drawer.js' %}"></script>
+  
+  {# Lightbox JS #}
+  <script src="{% static 'js/lightbox.js' %}"></script>
+  
+  {# Code Formatter JS #}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="{% static 'js/code-formatter.js' %}"></script>
+  
+
   {% block extra_js %}{% endblock %}
+
+  {# ── Bulletproof Lightbox Modal ───────────────────────────── #}
+  <div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; cursor: zoom-out;">
+    <img id="lightbox-img" src="" alt="" style="max-width: 90%; max-height: 90%; object-fit: contain;">
+  </div>
 
 </body>
 </html>
