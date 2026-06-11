@@ -30,9 +30,15 @@ class ClaimRequestStatus(models.TextChoices):
 
 # Thread domain choices
 class ThreadStatus(models.TextChoices):
-    OPEN = "open", "Open"
-    CLOSED = "closed", "Closed"
+    ACTIVE = "active", "Active"
     ARCHIVED = "archived", "Archived"
+    DELETED = "deleted", "Deleted"
+
+
+class ForumThreadStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    ARCHIVED = "archived", "Archived"
+    DELETED = "deleted", "Deleted"
 
 
 class ThreadMessageStatus(models.TextChoices):
@@ -137,12 +143,6 @@ class ListingStatus(models.TextChoices):
 
 class PurchaseRequestStatus(models.TextChoices):
     PENDING = "pending", "Pending"
-    APPROVED = "approved", "Approved"
-    REJECTED = "rejected", "Rejected"
-
-
-class NegotiationStatus(models.TextChoices):
-    PENDING = "pending", "Pending"
     ACCEPTED = "accepted", "Accepted"
     REJECTED = "rejected", "Rejected"
 
@@ -187,6 +187,7 @@ class RideGroupMemberStatus(models.TextChoices):
     CONFIRMED = "confirmed", "Confirmed"
     LEFT = "left", "Left"
     NO_SHOW = "no_show", "No Show"
+
 
 class RideMonitorRequestStatus(models.TextChoices):
     PENDING = "pending", "Pending"

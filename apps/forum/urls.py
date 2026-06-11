@@ -14,6 +14,8 @@ urlpatterns = [
     ),
     path("following/", views.my_following_threads, name="my_following_threads"),
     path("create/", views.thread_create, name="thread_create"),
+    path("<int:pk>/edit/", views.thread_edit, name="thread_edit"),
+    path("<int:pk>/delete/", views.thread_delete, name="thread_delete"),
     path("<int:pk>/", views.thread_detail, name="thread_detail"),
     path("messages/<int:message_id>/vote/", views.vote_message, name="vote_message"),
     path(

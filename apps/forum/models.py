@@ -1,10 +1,16 @@
 from django.db import models
 from django.conf import settings
 from apps.academics.models import Course, Department, Trimester
+from apps.common.choices import ForumThreadStatus
 
 
 # Create your models here.
 class ForumThread(models.Model):
+    status = models.CharField(
+        max_length=20,
+        choices=ForumThreadStatus.choices,
+        default=ForumThreadStatus.ACTIVE,
+    )
     is_announcement = models.BooleanField(default=False)
     is_pinned = models.BooleanField(default=False)
 

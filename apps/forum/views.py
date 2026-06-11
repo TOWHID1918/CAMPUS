@@ -10,15 +10,17 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.academics.models import Department, Course
-from apps.common.choices import ThreadVisibility
+from apps.common.choices import ForumThreadStatus, ThreadVisibility
 
-from .forms import ForumThreadCreateForm, ThreadMessageForm
+from .forms import ForumThreadCreateForm, ForumThreadEditForm, ThreadMessageForm
 from .filters import ForumThreadFilter
 from .models import ForumThread, ForumThreadFollower
 from .services import (
     get_current_trimester,
     create_forum_thread,
     create_thread_message,
+    update_forum_thread,
+    soft_delete_forum_thread,
     toggle_exclusive_message_pin,
     toggle_message_vote,
     toggle_thread_follow,
@@ -34,7 +36,11 @@ def public_threads(request):
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
         )
-        .filter(Q(thread__visibility=ThreadVisibility.PUBLIC))
+        .filter(
+            Q(thread__visibility=ThreadVisibility.PUBLIC),
+            status=ForumThreadStatus.ACTIVE,
+            is_announcement=False,
+        )
         .distinct()
         .order_by("-thread__created_at")
     )
@@ -62,7 +68,11 @@ def announcement_threads(request):
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
         )
-        .filter(thread__visibility=ThreadVisibility.PUBLIC, is_announcement=True)
+        .filter(
+            thread__visibility=ThreadVisibility.PUBLIC,
+            is_announcement=True,
+            status=ForumThreadStatus.ACTIVE,
+        )
         .order_by("-thread__created_at")
     )
     return render(request, "forum/announcement_threads.html", {"threads": threads})
@@ -75,7 +85,7 @@ def my_threads(request):
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
         )
-        .filter(author=request.user)
+        .filter(author=request.user, status=ForumThreadStatus.ACTIVE)
         .order_by("-thread__created_at")
     )
 
@@ -102,7 +112,9 @@ def my_participating_threads(request):
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
         )
-        .filter(thread__participants__user=request.user)
+        .filter(
+            thread__participants__user=request.user, status=ForumThreadStatus.ACTIVE
+        )
         .exclude(author=request.user)
         .distinct()
         .order_by("-thread__created_at")
@@ -120,6 +132,7 @@ def my_following_threads(request):
             "forum_thread__course",
             "forum_thread__department",
         )
+        .filter(forum_thread__status=ForumThreadStatus.ACTIVE)
         .order_by("-followed_at")
     )
     return render(
@@ -206,7 +219,7 @@ def thread_detail(request, pk):
     forum_thread = get_object_or_404(
         ForumThread.objects.select_related(
             "thread", "author", "course", "department", "trimester"
-        ),
+        ).filter(status=ForumThreadStatus.ACTIVE),
         pk=pk,
     )
     base_thread = forum_thread.thread
@@ -290,6 +303,60 @@ def thread_detail(request, pk):
         "is_following": is_following,
     }
     return render(request, "forum/thread_detail.html", context)
+
+
+@login_required
+def thread_edit(request, pk):
+    forum_thread = get_object_or_404(
+        ForumThread.objects.select_related("thread").filter(
+            status=ForumThreadStatus.ACTIVE
+        ),
+        pk=pk,
+    )
+
+    if forum_thread.author != request.user:
+        raise PermissionDenied("You do not have permission to edit this thread.")
+
+    if request.method == "POST":
+        form = ForumThreadEditForm(
+            request.POST, instance=forum_thread, user=request.user
+        )
+        if form.is_valid():
+            update_forum_thread(
+                user=request.user,
+                forum_thread=forum_thread,
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                department=form.cleaned_data["department"],
+                course=form.cleaned_data["course"],
+                participants_list=form.cleaned_data["participants"],
+            )
+            messages.success(request, "Thread updated successfully.")
+            return redirect("forum:thread_detail", pk=forum_thread.pk)
+    else:
+        form = ForumThreadEditForm(instance=forum_thread, user=request.user)
+
+    return render(
+        request, "forum/thread_edit.html", {"form": form, "forum_thread": forum_thread}
+    )
+
+
+@login_required
+@require_POST
+def thread_delete(request, pk):
+    forum_thread = get_object_or_404(
+        ForumThread.objects.select_related("thread").filter(
+            status=ForumThreadStatus.ACTIVE
+        ),
+        pk=pk,
+    )
+
+    if forum_thread.author != request.user:
+        raise PermissionDenied("You do not have permission to delete this thread.")
+
+    soft_delete_forum_thread(user=request.user, forum_thread_id=pk)
+    messages.success(request, "Thread deleted successfully.")
+    return redirect("forum:my_threads")
 
 
 @login_required

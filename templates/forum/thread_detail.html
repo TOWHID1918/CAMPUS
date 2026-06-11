@@ -23,6 +23,18 @@
           {{ base_thread.visibility|title }}
         </span>
 
+        {% if forum_thread.author == request.user %}
+          <a href="{% url 'forum:thread_edit' forum_thread.pk %}" class="btn btn--ghost btn--sm">
+            ✏️ Edit
+          </a>
+          <button type="button" id="delete-thread-btn" class="btn btn--ghost btn--sm btn--danger">
+            🗑 Delete
+          </button>
+          <form id="thread-delete-form" method="post" action="{% url 'forum:thread_delete' forum_thread.pk %}" style="display:none;">
+            {% csrf_token %}
+          </form>
+        {% endif %}
+
         {# Follow button — state driven by is_following passed from the view #}
         <button
           id="follow-btn"
@@ -32,7 +44,6 @@
         >
           {% if is_following %}✓ Following{% else %}+ Follow{% endif %}
         </button>
-        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
       </div>
     </div>
 

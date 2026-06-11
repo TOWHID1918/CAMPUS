@@ -118,7 +118,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- 4. Pinning / Mark as Best Answer Logic ---
+  // --- 4. Delete Thread Confirmation ---
+  const deleteThreadBtn = document.getElementById('delete-thread-btn');
+  if (deleteThreadBtn) {
+    deleteThreadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const confirmed = window.confirm(
+        'Are you sure you want to delete this thread? This will archive the related discussion.'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const deleteForm = document.getElementById('thread-delete-form');
+      if (deleteForm) {
+        deleteForm.submit();
+      }
+    });
+  }
+
+  // --- 5. Pinning / Mark as Best Answer Logic ---
   document.addEventListener('click', async (e) => {
     const pinBtn = e.target.closest('.btn-pin-message');
     if (!pinBtn) return;

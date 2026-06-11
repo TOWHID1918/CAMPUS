@@ -1,9 +1,11 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 
 from apps.academics.models import Course, Department
+from apps.forum.models import ForumThread
 from apps.threads.models import ThreadMessage
 
 User = get_user_model()
@@ -81,11 +83,61 @@ class ForumThreadCreateForm(forms.Form):
         is_announcement = cleaned_data.get("is_announcement", False)
 
         if is_announcement:
-            if not self.user or not getattr(self.user, "is_moderator", False):
+            if not self.user or not getattr(self.user.profile, "is_moderator", False):
                 raise ValidationError(
                     "Only moderators are allowed to create announcement threads."
                 )
         return cleaned_data
+
+
+class ForumThreadEditForm(forms.ModelForm):
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 5}),
+        required=True,
+        help_text="Edit the main body text for your thread.",
+    )
+    participants = forms.CharField(
+        required=False,
+        help_text="Edit comma-separated handles/student IDs to change participants.",
+    )
+
+    class Meta:
+        model = ForumThread
+        fields = ["title", "department", "course"]
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.thread:
+            self.fields["description"].initial = self.instance.thread.description
+            # Populate current participants as comma-separated handles
+            current_participants = self.instance.thread.participants.exclude(
+                user=self.instance.author
+            ).values_list("user__handle", flat=True)
+            if current_participants:
+                self.fields["participants"].initial = ", ".join(current_participants)
+
+    def clean_participants(self):
+        data = self.cleaned_data.get("participants", "").strip()
+        if not data:
+            return []  # No additional participants
+
+        entries = [u.strip() for u in data.split(",") if u.strip()]
+        users = list(
+            User.objects.filter(
+                Q(handle__in=entries) | Q(profile__student_id__in=entries)
+            )
+        )
+
+        found_entries = {u.handle for u in users} | {
+            u.profile.student_id for u in users if u.profile.student_id
+        }
+        missing = [entry for entry in entries if entry not in found_entries]
+        if missing:
+            raise ValidationError(f"Users not found: {', '.join(missing)}")
+
+        return users
 
 
 class ThreadMessageForm(forms.ModelForm):

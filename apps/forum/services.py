@@ -5,8 +5,14 @@ from django.core.exceptions import PermissionDenied
 from django.http import QueryDict
 
 from apps.academics.models import Trimester
-from apps.academics.models import Department, Course
-from apps.common.choices import ThreadVisibility, ThreadParticipantRole, VoteType
+from apps.common.choices import (
+    ThreadStatus,
+    ThreadVisibility,
+    ThreadParticipantRole,
+    VoteType,
+    ForumThreadStatus,
+    ThreadParticipantRole,
+)
 from apps.threads.models import Thread, ThreadMessage, MessageAttachment, MessageVote
 from apps.forum.models import ForumThread, ForumThreadFollower
 from apps.media.models import Photo
@@ -73,7 +79,7 @@ def create_forum_thread(
                 notify(
                     recipient=p_user,
                     verb=(
-                        f"You were added to a new private forum base_thread: "
+                        f"You were added to a new private forum thread: "
                         f"'{forum_thread.title}' by {user.handle}"
                     ),
                     target=forum_thread,
@@ -81,6 +87,113 @@ def create_forum_thread(
                         "url": reverse("forum:thread_detail", args=[forum_thread.id])
                     },
                 )
+
+    return forum_thread
+
+
+def update_forum_thread(
+    user,
+    forum_thread,
+    title,
+    description,
+    department,
+    course,
+    participants_list=None,
+    is_announcement=False,
+):
+    if forum_thread.author != user:
+        raise PermissionDenied("Only the author can edit this thread.")
+
+    if forum_thread.status == ForumThreadStatus.DELETED:
+        raise ValueError("Cannot edit a deleted thread.")
+
+    forum_thread.title = title
+    forum_thread.department = department
+    forum_thread.course = course
+    forum_thread.is_announcement = is_announcement
+
+    base_thread = forum_thread.thread
+    base_thread.title = f"Forum Thread: {title}"
+    base_thread.description = description
+
+    new_members_added = []
+    with transaction.atomic():
+        if participants_list is not None:
+            participant_list = [
+                p for p in participants_list if p != forum_thread.author
+            ]
+            base_thread.visibility = (
+                ThreadVisibility.PRIVATE
+                if participant_list
+                else ThreadVisibility.PUBLIC
+            )
+            new_members_added = _sync_forum_thread_participants(
+                base_thread=base_thread,
+                author=forum_thread.author,
+                new_participants=participant_list,
+            )
+            base_thread.save(update_fields=["title", "description", "visibility"])
+        else:
+            base_thread.save(update_fields=["title", "description"])
+
+        forum_thread.save(
+            update_fields=["title", "department", "course", "is_announcement"]
+        )
+
+    for p_user in new_members_added:
+        notify(
+            recipient=p_user,
+            verb=(
+                f"You were added to the forum thread: "
+                f"'{forum_thread.title}' by {user.handle}"
+            ),
+            target=forum_thread,
+            data={"url": reverse("forum:thread_detail", args=[forum_thread.id])},
+        )
+
+    return forum_thread
+
+
+def _sync_forum_thread_participants(base_thread, author, new_participants):
+    """Sync thread participants for a forum base thread."""
+
+    new_participants = [p for p in new_participants if p != author]
+    new_participant_ids = {p.id for p in new_participants}
+
+    existing = base_thread.participants.exclude(user=author).select_related("user")
+    existing_user_ids = {p.user.id for p in existing}
+
+    to_remove = existing_user_ids - new_participant_ids
+    if to_remove:
+        base_thread.participants.filter(user_id__in=to_remove).delete()
+
+    to_add = new_participant_ids - existing_user_ids
+    for user in new_participants:
+        if user.id in to_add:
+            base_thread.participants.get_or_create(
+                user=user,
+                defaults={"role": ThreadParticipantRole.MEMBER},
+            )
+
+    return [p for p in new_participants if p.id in to_add]
+
+
+def soft_delete_forum_thread(user, forum_thread_id):
+    forum_thread = get_object_or_404(ForumThread, pk=forum_thread_id)
+
+    if forum_thread.author != user:
+        raise PermissionDenied("Only the author can delete this thread.")
+
+    if forum_thread.status == ForumThreadStatus.DELETED:
+        raise ValueError("Thread is already deleted.")
+
+    base_thread = forum_thread.thread
+    forum_thread.status = ForumThreadStatus.DELETED
+    base_thread.status = ThreadStatus.ARCHIVED
+
+    with transaction.atomic():
+        base_thread.save(update_fields=["status"])
+        forum_thread.save(update_fields=["status"])
 
     return forum_thread
 

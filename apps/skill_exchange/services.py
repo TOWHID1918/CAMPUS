@@ -307,7 +307,7 @@ def process_session_completion(session: ExchangeSession, user) -> dict:
         if locked.user_a_completed and locked.user_b_completed:
             locked.status = ExchangeSessionStatus.COMPLETED
             locked.save()
-            locked.thread.status = ThreadStatus.CLOSED
+            locked.thread.status = ThreadStatus.ARCHIVED
             locked.thread.save()
             fully_completed = True
         else:

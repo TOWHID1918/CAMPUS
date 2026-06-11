@@ -8,6 +8,7 @@ class ForumThreadAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "title",
+        "status",
         "author",
         "course",
         "department",
