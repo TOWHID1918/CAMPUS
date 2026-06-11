@@ -105,9 +105,5 @@ class PurchaseOrder(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ["-created_at"]
-        db_table = "marketplace_negotiationthread"
-
     def __str__(self):
         return f"{self.buyer} → {self.listing} ({self.quantity})"
