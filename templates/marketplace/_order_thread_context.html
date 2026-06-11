@@ -1,0 +1,104 @@
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card__header">
+    <div>
+      <p class="card__title">Marketplace Order</p>
+      <div class="card__meta">
+        <span class="badge badge--active">{{ ctx.listing.status }}</span>
+        <span>Listing #{{ ctx.listing.pk }}</span>
+        <span>Buyer: {{ ctx.buyer.get_full_name|default:ctx.buyer.email }}</span>
+        <span>Qty: {{ ctx.quantity }}</span>
+      </div>
+    </div>
+    <div class="card__actions" style="display:flex; gap: 10px; align-items:center;">
+      <a href="{% url 'marketplace:listing_detail' listing_id=ctx.listing.id %}"
+         class="btn btn--outline btn--sm">
+        View Listing
+      </a>
+
+      {% if user == ctx.seller and ctx.status == "accepted" %}
+        <form action="{% url 'marketplace:complete_order' order_id=ctx.id %}" method="post" style="display:inline; margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--primary btn--sm">
+            Mark Order Complete
+          </button>
+        </form>
+
+        <form action="{% url 'marketplace:reject_order' order_id=ctx.id %}" method="post" style="display:inline; margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--outline btn--sm">
+            Reject Order
+          </button>
+        </form>
+      {% elif user == ctx.buyer and ctx.status == "completed" %}
+        <form action="{% url 'marketplace:confirm_order_received' order_id=ctx.id %}" method="post" style="display:inline; margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--primary btn--sm">
+            Confirm Received
+          </button>
+        </form>
+      {% elif user == ctx.seller and ctx.status == "completed" %}
+        <div>
+          <span class="badge badge--pending">Waiting for buyer confirmation</span>
+        </div>
+      {% elif ctx.listing.status != "sold" and user == ctx.seller and ctx.status == "accepted" %}
+        <form action="{% url 'marketplace:confirm_order' order_id=ctx.id %}" method="post" style="display:inline; margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--primary btn--sm">
+            Confirm Sale
+          </button>
+        </form>
+
+        <form action="{% url 'marketplace:reject_order' order_id=ctx.id %}" method="post" style="display:inline; margin:0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn--outline btn--sm">
+            Reject Order
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card__body">
+    <p>
+      This thread is an order thread for
+      <strong>{{ ctx.listing.title }}</strong>
+      listed at <strong style="color: var(--orange);">৳{{ ctx.listing.price }}</strong>
+      by
+      <a href="{% url 'accounts:profile' ctx.listing.seller.handle %}">
+        @{{ ctx.listing.seller.handle }}
+      </a>.
+    </p>
+
+      {% if ctx.status == "completed" %}
+      <div class="alert alert--info" style="margin-top: 16px;">
+        <p style="margin: 0;">
+          Seller has marked this order complete. Please confirm receipt once you have received your items.
+        </p>
+      </div>
+    {% elif ctx.status == "received" %}
+      <div class="alert alert--success" style="margin-top: 16px;">
+        <p style="margin: 0;">
+          Order completed successfully. Thank you for using CAMPUS Marketplace.
+        </p>
+      </div>
+    {% elif ctx.listing.status == "sold" %}
+      <div class="alert alert--success" style="margin-top: 16px;">
+        <p style="margin: 0;">
+          Item has been sold to
+          <a href="{% url 'accounts:profile' ctx.buyer.handle %}">@{{ ctx.buyer.handle }}</a>.
+        </p>
+      </div>
+      <div class="alert alert--info" style="margin-top: 16px;">
+        <p style="margin: 0;">
+          This thread will remain open for the next step of the buy/sell procedure.
+        </p>
+      </div>
+    {% elif ctx.status == "rejected" and ctx.listing.status == "active" %}
+      <div class="alert alert--warning" style="margin-top: 16px;">
+        <p style="margin: 0;">
+          This order has been rejected.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</div>

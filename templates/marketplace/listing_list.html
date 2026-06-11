@@ -132,6 +132,13 @@
               </svg>
               {{ listing.created_at|date:"M j, Y" }}
             </div>
+            <div class="post-card__meta-item">
+              {% if listing.stock and listing.stock > 0 %}
+                Stock: {{ listing.stock }}
+              {% else %}
+                Out of stock
+              {% endif %}
+            </div>
           </div>
 
           <div class="post-card__footer">

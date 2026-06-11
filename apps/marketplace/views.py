@@ -1,7 +1,8 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db import transaction
+from django.urls import reverse
+from django.db import models, transaction
 from django.http import HttpResponseForbidden
 
 from apps.media.models import Photo
@@ -10,21 +11,26 @@ from apps.common.choices import (
     ThreadVisibility,
     ThreadParticipantRole,
     ThreadStatus,
-    NegotiationStatus,
+    OrderStatus,
 )
 
 from .models import (
     Listing,
     ListingPhoto,
-    NegotiationThread,
+    PurchaseOrder,
     ListingStatus,
     Category,
-    PurchaseRequest,
-    PurchaseRequestStatus,
 )
+from apps.notifications.signals import notify
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_PHOTO_MB = 5
+
+ACCEPTED_ORDER_STATUSES = [
+    OrderStatus.ACCEPTED,
+    OrderStatus.COMPLETED,
+]
+TERMINAL_ORDER_STATUSES = [OrderStatus.REJECTED, OrderStatus.RECEIVED]
 
 
 def listing_list(request):
@@ -41,7 +47,7 @@ def listing_list(request):
 
     if category_id:
         listings = listings.filter(category_id=category_id)
-    
+
     if search:
         listings = listings.filter(title__icontains=search)
         print(f"DEBUG search='{search}' results={listings.count()}")
@@ -72,20 +78,47 @@ def listing_detail(request, listing_id):
 
     listing = get_object_or_404(Listing, id=listing_id)
 
-    negotiation = None
+    active_order = None
+    pending_request = None
+    pending_orders_count = 0
 
     if request.user.is_authenticated:
+        pending_request = (
+            PurchaseOrder.objects.filter(
+                listing=listing,
+                buyer=request.user,
+                status=OrderStatus.PENDING,
+            )
+            .order_by("-created_at")
+            .first()
+        )
 
-        negotiation = NegotiationThread.objects.filter(
-            listing=listing, buyer=request.user
-        ).first()
+        active_order = (
+            PurchaseOrder.objects.filter(
+                listing=listing,
+                buyer=request.user,
+                status__in=ACCEPTED_ORDER_STATUSES,
+                thread__isnull=False,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+    # Count pending order requests for seller
+    if request.user.is_authenticated and request.user == listing.seller:
+        pending_orders_count = PurchaseOrder.objects.filter(
+            listing=listing,
+            status=OrderStatus.PENDING,
+        ).count()
 
     return render(
         request,
         "marketplace/listing_detail.html",
         {
             "listing": listing,
-            "negotiation": negotiation,
+            "active_order": active_order,
+            "pending_request": pending_request,
+            "pending_orders_count": pending_orders_count,
         },
     )
 
@@ -201,7 +234,9 @@ def edit_listing(request, listing_id):
                 },
             )
 
-        listing.category = Category.objects.filter(pk=category_id).first() if category_id else None
+        listing.category = (
+            Category.objects.filter(pk=category_id).first() if category_id else None
+        )
 
         status = request.POST.get("status")
         if status in ListingStatus.values:
@@ -245,57 +280,43 @@ def edit_listing(request, listing_id):
 
 
 @login_required
-def submit_purchase_request(request, listing_id):
-    listing = get_object_or_404(
-        Listing,
-        pk=listing_id,
-        status=ListingStatus.ACTIVE,
-    )
-
-    if listing.seller == request.user:
-        return HttpResponseForbidden("You cannot request your own listing.")
-
-    existing = PurchaseRequest.objects.filter(
-        buyer=request.user,
-        listing=listing,
-    ).first()
-
-    if existing:
-        return redirect("marketplace:listing_detail", listing_id=listing.id)
-
-    if request.method == "POST":
-        message = request.POST.get("message", "").strip()
-
-        PurchaseRequest.objects.create(
-            buyer=request.user,
-            listing=listing,
-            message=message,
-        )
-
-    return redirect("marketplace:listing_detail", listing_id=listing.id)
-
-
-@login_required
-def review_purchase_requests(request, listing_id):
+def review_orders(request, listing_id):
     listing = get_object_or_404(
         Listing,
         pk=listing_id,
         seller=request.user,
     )
 
-    requests = (
-        PurchaseRequest.objects.filter(listing=listing)
-        .select_related("buyer")
-        .order_by("-created_at")
+    search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "first")
+    # Orders shown in the Orders page
+    requests = PurchaseOrder.objects.filter(listing=listing).select_related(
+        "buyer", "thread"
     )
+
+    if search:
+        requests = requests.filter(
+            models.Q(buyer__handle__icontains=search)
+            | models.Q(buyer__email__icontains=search)
+        )
+
+    if sort == "quantity_low":
+        requests = requests.order_by("quantity", "created_at")
+    elif sort == "quantity_high":
+        requests = requests.order_by("-quantity", "created_at")
+    elif sort == "latest":
+        requests = requests.order_by("-created_at")
+    else:
+        requests = requests.order_by("created_at")
 
     return render(
         request,
-        "marketplace/review_purchase_requests.html",
+        "marketplace/review_orders.html",
         {
             "listing": listing,
             "requests": requests,
-            "PurchaseRequestStatus": PurchaseRequestStatus,
+            "current_search": search,
+            "current_sort": sort,
         },
     )
 
@@ -308,35 +329,29 @@ def approve_purchase_request(request, listing_id, request_id):
         seller=request.user,
     )
 
-    purchase_request = get_object_or_404(
-        PurchaseRequest,
-        pk=request_id,
-        listing=listing,
-        status=PurchaseRequestStatus.PENDING,
+    # Try to load the order thread but handle missing/changed state gracefully
+    order = (
+        PurchaseOrder.objects.select_related("buyer", "listing")
+        .filter(pk=request_id)
+        .first()
     )
+
+    if not order:
+        messages.error(request, "Order request not found.")
+        return redirect("marketplace:review_orders", listing_id=listing.id)
+
+    if order.listing_id != listing.id:
+        messages.error(request, "Order does not belong to this listing.")
+        return redirect("marketplace:review_orders", listing_id=listing.id)
+
+    if order.status != OrderStatus.PENDING:
+        messages.info(request, "This order request is no longer pending.")
+        return redirect("marketplace:review_orders", listing_id=listing.id)
 
     if request.method == "POST":
         with transaction.atomic():
-
-            # approve selected request
-            purchase_request.status = PurchaseRequestStatus.APPROVED
-            purchase_request.save(update_fields=["status", "updated_at"])
-
-            # reject others
-            PurchaseRequest.objects.filter(
-                listing=listing,
-                status=PurchaseRequestStatus.PENDING,
-            ).exclude(pk=purchase_request.pk).update(
-                status=PurchaseRequestStatus.REJECTED
-            )
-
-            # mark listing sold
-            listing.status = ListingStatus.SOLD
-            listing.save(update_fields=["status", "updated_at"])
-
-            # create private thread
             thread = Thread.objects.create(
-                title=f"Marketplace purchase: {listing.title}",
+                title=f"Marketplace order: {listing.title}",
                 visibility=ThreadVisibility.PRIVATE,
             )
 
@@ -348,15 +363,29 @@ def approve_purchase_request(request, listing_id, request_id):
 
             ThreadParticipant.objects.create(
                 thread=thread,
-                user=purchase_request.buyer,
+                user=order.buyer,
                 role=ThreadParticipantRole.MEMBER,
             )
 
-            NegotiationThread.objects.create(
-                listing=listing,
-                buyer=purchase_request.buyer,
-                thread=thread,
-            )
+            order.thread = thread
+            order.status = OrderStatus.ACCEPTED
+            order.save(update_fields=["thread", "status"])
+
+            # notify buyer that their order was accepted via review
+            try:
+                notify(
+                    order.buyer,
+                    "Order accepted — private conversation created",
+                    target=order,
+                    data={
+                        "thread_id": thread.id,
+                        "order_id": order.id,
+                        "listing_id": listing.id,
+                        "url": reverse("threads:thread_detail", args=[thread.id]),
+                    },
+                )
+            except Exception:
+                pass
 
         return redirect(
             "threads:thread_detail",
@@ -368,9 +397,128 @@ def approve_purchase_request(request, listing_id, request_id):
         "marketplace/approve_purchase_request.html",
         {
             "listing": listing,
-            "purchase_request": purchase_request,
+            "purchase_request": order,
         },
     )
+
+
+@login_required
+def reject_purchase_request(request, listing_id, request_id):
+    listing = get_object_or_404(
+        Listing,
+        pk=listing_id,
+        seller=request.user,
+    )
+
+    order = (
+        PurchaseOrder.objects.select_related("buyer", "listing")
+        .filter(pk=request_id)
+        .first()
+    )
+
+    if not order or order.listing_id != listing.id:
+        messages.error(request, "Order request not found.")
+        return redirect("marketplace:review_orders", listing_id=listing.id)
+
+    if request.method == "POST":
+        if order.status != OrderStatus.PENDING:
+            messages.info(request, "This order request is no longer pending.")
+        else:
+            order.status = OrderStatus.REJECTED
+            order.save(update_fields=["status"])
+            messages.success(request, "Order request rejected.")
+            try:
+                notify(
+                    order.buyer,
+                    "Order request rejected by seller",
+                    target=order,
+                    data={
+                        "order_id": order.id,
+                        "listing_id": listing.id,
+                        "url": reverse("marketplace:listing_detail", args=[listing.id]),
+                    },
+                )
+            except Exception:
+                pass
+
+    return redirect("marketplace:review_orders", listing_id=listing.id)
+
+
+@login_required
+def complete_order(request, order_id):
+    order = get_object_or_404(
+        PurchaseOrder,
+        id=order_id,
+        seller=request.user,
+        status=OrderStatus.ACCEPTED,
+    )
+
+    if request.method == "POST":
+        order.status = OrderStatus.COMPLETED
+        order.save(update_fields=["status"])
+        messages.success(
+            request, "Order marked complete. Waiting for buyer confirmation."
+        )
+        try:
+            notify(
+                order.buyer,
+                "Seller marked your order as complete",
+                target=order,
+                data={
+                    "order_id": order.id,
+                    "listing_id": order.listing.id,
+                    "url": reverse("threads:thread_detail", args=[order.thread.id]),
+                },
+            )
+        except Exception:
+            pass
+
+    return redirect("threads:thread_detail", thread_id=order.thread.id)
+
+
+@login_required
+def confirm_order_received(request, order_id):
+    order = get_object_or_404(
+        PurchaseOrder,
+        id=order_id,
+        buyer=request.user,
+        status=OrderStatus.COMPLETED,
+    )
+
+    if request.method == "POST":
+        with transaction.atomic():
+            order.status = OrderStatus.RECEIVED
+            order.save(update_fields=["status"])
+
+            listing = order.listing
+            # decrement available stock by the ordered quantity
+            try:
+                listing.stock = max(0, listing.stock - order.quantity)
+            except Exception:
+                listing.stock = 0
+
+            if listing.stock == 0:
+                listing.status = ListingStatus.SOLD
+                listing.save(update_fields=["stock", "status", "updated_at"])
+            else:
+                listing.save(update_fields=["stock", "updated_at"])
+
+        messages.success(request, "Order confirmed received.")
+        try:
+            notify(
+                order.seller,
+                "Buyer confirmed receipt for the order",
+                target=order,
+                data={
+                    "order_id": order.id,
+                    "listing_id": order.listing.id,
+                    "url": reverse("threads:thread_detail", args=[order.thread.id]),
+                },
+            )
+        except Exception:
+            pass
+
+    return redirect("threads:thread_detail", thread_id=order.thread.id)
 
 
 @login_required
@@ -384,36 +532,47 @@ def contact_seller(request, listing_id):
         return HttpResponseForbidden("This listing is no longer active.")
 
     existing = (
-        NegotiationThread.objects.filter(listing=listing, buyer=request.user)
+        PurchaseOrder.objects.filter(listing=listing, buyer=request.user)
+        .exclude(status__in=TERMINAL_ORDER_STATUSES)
         .select_related("thread")
         .first()
     )
-
     if existing:
-        return redirect("threads:thread_detail", thread_id=existing.thread.id)
+        # If a private thread already exists, open it. Otherwise inform buyer their request is pending.
+        if existing.thread:
+            return redirect("threads:thread_detail", thread_id=existing.thread.id)
+        else:
+            messages.info(request, "You already have an open request for this listing.")
+            return redirect("marketplace:listing_detail", listing_id=listing.id)
 
+    # Create an order record (default quantity 1) but do not create a private thread yet.
     with transaction.atomic():
-        thread = Thread.objects.create(
-            title=f"Re: {listing.title}",
-            visibility=ThreadVisibility.PRIVATE,
-        )
-        ThreadParticipant.objects.create(
-            thread=thread,
-            user=request.user,
-            role=ThreadParticipantRole.MEMBER,
-        )
-        ThreadParticipant.objects.create(
-            thread=thread,
-            user=listing.seller,
-            role=ThreadParticipantRole.AUTHOR,
-        )
-        NegotiationThread.objects.create(
+        order = PurchaseOrder.objects.create(
             listing=listing,
             buyer=request.user,
-            thread=thread,
+            seller=listing.seller,
+            status=OrderStatus.PENDING,
+            quantity=1,
         )
 
-    return redirect("threads:thread_detail", thread_id=thread.id)
+    # Notify the seller about the new order/inquiry
+    try:
+        notify(
+            listing.seller,
+            "New inquiry about your listing",
+            target=order,
+            data={
+                "order_id": order.id,
+                "listing_id": listing.id,
+                "url": reverse("marketplace:review_orders", args=[listing.id]),
+            },
+        )
+    except Exception:
+        pass
+
+    messages.success(request, "Contact request submitted. The seller will be notified.")
+
+    return redirect("marketplace:listing_detail", listing_id=listing.id)
 
 
 @login_required
@@ -424,6 +583,12 @@ def my_listings(request):
         Listing.objects.filter(seller=request.user)
         .select_related("category")
         .prefetch_related("photos__photo")
+        .annotate(
+            pending_orders_count=models.Count(
+                "purchase_orders",
+                filter=models.Q(purchase_orders__status=OrderStatus.PENDING),
+            )
+        )
         .order_by("-created_at")
     )
     if search:
@@ -448,30 +613,30 @@ def my_listings(request):
 
 
 @login_required
-def my_negotiations_buyer(request):
+def my_orders_buyer(request):
     search = request.GET.get("search", "").strip()
     sort = request.GET.get("sort", "newest")
-    negotiations = (
-        NegotiationThread.objects.filter(buyer=request.user)
+    orders = (
+        PurchaseOrder.objects.filter(buyer=request.user)
         .select_related("listing", "listing__seller", "listing__category", "thread")
         .prefetch_related("listing__photos__photo")
         .order_by("-created_at")
     )
     if search:
-        negotiations = negotiations.filter(listing__title__icontains=search)
+        orders = orders.filter(listing__title__icontains=search)
     if sort == "oldest":
-        negotiations = negotiations.order_by("created_at")
+        orders = orders.order_by("created_at")
     elif sort == "price_low":
-        negotiations = negotiations.order_by("listing__price")
+        orders = orders.order_by("listing__price")
     elif sort == "price_high":
-        negotiations = negotiations.order_by("-listing__price")
+        orders = orders.order_by("-listing__price")
     else:
-        negotiations = negotiations.order_by("-created_at")
+        orders = orders.order_by("-created_at")
     return render(
         request,
-        "marketplace/negotiations_buyer.html",
+        "marketplace/orders_buyer.html",
         {
-            "negotiations": negotiations,
+            "orders": orders,
             "current_search": search,
             "current_sort": sort,
         },
@@ -480,99 +645,137 @@ def my_negotiations_buyer(request):
 
 @login_required
 def review_inquiries(request, listing_id):
-    """
-    Seller reviews all negotiations/inquiries for one listing.
-    Similar to lost_found.review_claims
-    """
-
-    listing = get_object_or_404(
-        Listing.objects.select_related("category"),
-        pk=listing_id,
-        seller=request.user,
-    )
-
-    inquiries = (
-        NegotiationThread.objects.filter(listing=listing)
-        .select_related("buyer", "thread")
-        .order_by("-created_at")
-    )
-
-    return render(
-        request,
-        "marketplace/review_inquiries.html",
-        {
-            "listing": listing,
-            "inquiries": inquiries,
-        },
-    )
+    # Redirect legacy inquiries URL to the unified orders page
+    return redirect("marketplace:review_orders", listing_id=listing_id)
 
 
 @login_required
 def request_chat(request, listing_id):
 
-    listing = get_object_or_404(Listing, id=listing_id)
-
-    if listing.seller == request.user:
-        messages.error(request, "You cannot request your own listing.")
-        return redirect("marketplace:listing_detail", listing_id=listing.id)
-
-    existing = NegotiationThread.objects.filter(
-        listing=listing, buyer=request.user
-    ).first()
-
-    if existing:
-        messages.warning(request, "Request already exists.")
-        return redirect("marketplace:listing_detail", listing_id=listing.id)
-
-    NegotiationThread.objects.create(
-        listing=listing,
-        buyer=request.user,
-        seller=listing.seller,
-        status=NegotiationStatus.PENDING,
+    listing = get_object_or_404(
+        Listing,
+        id=listing_id,
+        status=ListingStatus.ACTIVE,
     )
 
-    messages.success(request, "Chat request sent.")
+    if listing.seller == request.user:
+        return HttpResponseForbidden("You cannot request your own listing.")
+
+    if listing.stock <= 0:
+        messages.error(request, "This listing is currently out of stock.")
+        return redirect("marketplace:listing_detail", listing_id=listing.id)
+
+    existing_order = (
+        PurchaseOrder.objects.filter(
+            listing=listing,
+            buyer=request.user,
+        )
+        .exclude(status__in=TERMINAL_ORDER_STATUSES)
+        .exists()
+    )
+
+    if existing_order:
+        messages.warning(request, "You already have an active order for this listing.")
+        return redirect("marketplace:listing_detail", listing_id=listing.id)
+
+    if request.method == "POST":
+        quantity = request.POST.get("quantity", "1").strip()
+        message = request.POST.get("message", "").strip()
+        errors = []
+
+        try:
+            quantity = int(quantity)
+            if quantity < 1:
+                raise ValueError
+        except ValueError:
+            errors.append("Enter a valid order quantity.")
+
+        if quantity > listing.stock:
+            errors.append("Requested quantity cannot exceed available stock.")
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return redirect("marketplace:listing_detail", listing_id=listing.id)
+
+        order = PurchaseOrder.objects.create(
+            listing=listing,
+            buyer=request.user,
+            seller=listing.seller,
+            quantity=quantity,
+            message=message,
+            status=OrderStatus.PENDING,
+        )
+        # Notify the seller about the new order request
+        try:
+            notify(
+                listing.seller,
+                "New order request for your listing",
+                target=order,
+                data={
+                    "url": reverse("marketplace:listing_detail", args=[listing.id]),
+                    "order_id": order.id,
+                    "listing_id": listing.id,
+                },
+            )
+        except Exception:
+            pass
+        messages.success(request, "Order request submitted.")
 
     return redirect("marketplace:listing_detail", listing_id=listing.id)
 
 
 @login_required
-def accept_negotiation(request, negotiation_id):
+def accept_order(request, order_id):
 
-    negotiation = get_object_or_404(
-        NegotiationThread, id=negotiation_id, seller=request.user
-    )
+    order = get_object_or_404(PurchaseOrder, id=order_id, seller=request.user)
 
     # prevent accepting twice
-    if negotiation.status != NegotiationStatus.PENDING:
-        return redirect("marketplace:negotiations_seller")
+    if order.status != OrderStatus.PENDING:
+        return redirect("marketplace:review_inquiries", listing_id=order.listing.id)
 
     with transaction.atomic():
 
         # create private thread
         thread = Thread.objects.create(
-            title=f"Marketplace: {negotiation.listing.title}",
+            title=f"Marketplace: {order.listing.title}",
             visibility=ThreadVisibility.PRIVATE,
         )
 
         # seller participant
         ThreadParticipant.objects.create(
             thread=thread,
-            user=negotiation.seller,
+            user=order.seller,
             role=ThreadParticipantRole.AUTHOR,
         )
 
         # buyer participant
         ThreadParticipant.objects.create(
             thread=thread,
-            user=negotiation.buyer,
+            user=order.buyer,
             role=ThreadParticipantRole.MEMBER,
         )
 
-        # connect thread to negotiation
-        negotiation.thread = thread
-        negotiation.status = NegotiationStatus.ACCEPTED
-        negotiation.save(update_fields=["thread", "status"])
+        # connect thread to order
+        order.thread = thread
+        order.status = OrderStatus.ACCEPTED
+        order.save(update_fields=["thread", "status"])
+
+    # notify buyer that their chat request was accepted
+    try:
+        notify(
+            order.buyer,
+            "Chat request accepted — conversation created",
+            target=order,
+            data={
+                "thread_id": thread.id,
+                "order_id": order.id,
+                "listing_id": order.listing.id,
+                "url": reverse("threads:thread_detail", args=[thread.id]),
+            },
+        )
+    except Exception:
+        pass
 
     messages.success(request, "Chat request accepted.")
 
@@ -580,97 +783,143 @@ def accept_negotiation(request, negotiation_id):
 
 
 @login_required
-def confirm_negotiation(request, negotiation_id):
+def confirm_order(request, order_id):
 
-    negotiation = get_object_or_404(
-        NegotiationThread,
-        id=negotiation_id,
+    order = get_object_or_404(
+        PurchaseOrder,
+        id=order_id,
         seller=request.user,
-        status=NegotiationStatus.ACCEPTED,
+        status=OrderStatus.ACCEPTED,
     )
 
-    listing = negotiation.listing
+    listing = order.listing
 
     if listing.status == ListingStatus.SOLD:
         messages.info(request, "This listing has already been marked sold.")
-        return redirect("threads:thread_detail", thread_id=negotiation.thread.id)
+        return redirect("threads:thread_detail", thread_id=order.thread.id)
 
     with transaction.atomic():
-        other_negotiations = listing.negotiation_threads.exclude(id=negotiation.id)
-        for other in other_negotiations:
-            if other.status != NegotiationStatus.REJECTED:
-                other.status = NegotiationStatus.REJECTED
+        other_orders = listing.purchase_orders.exclude(id=order.id)
+        for other in other_orders:
+            if other.status != OrderStatus.REJECTED:
+                other.status = OrderStatus.REJECTED
                 other.save(update_fields=["status"])
+                try:
+                    notify(
+                        other.buyer,
+                        "Order request rejected — another buyer confirmed purchase",
+                        target=other,
+                        data={
+                            "order_id": other.id,
+                            "listing_id": listing.id,
+                            "url": reverse(
+                                "marketplace:listing_detail", args=[listing.id]
+                            ),
+                        },
+                    )
+                except Exception:
+                    pass
                 if other.thread:
-                    other.thread.status = ThreadStatus.CLOSED
+                    other.thread.status = ThreadStatus.ARCHIVED
                     other.thread.save(update_fields=["status"])
 
         listing.status = ListingStatus.SOLD
         listing.save(update_fields=["status"])
+    # notify confirmed buyer
+    try:
+        notify(
+            order.buyer,
+            "Order confirmed — listing marked sold",
+            target=order,
+            data={
+                "order_id": order.id,
+                "listing_id": listing.id,
+                "url": reverse("threads:thread_detail", args=[order.thread.id]),
+            },
+        )
+    except Exception:
+        pass
 
-    messages.success(request, "Negotiation confirmed and listing marked sold.")
-    return redirect("threads:thread_detail", thread_id=negotiation.thread.id)
+    messages.success(request, "Order confirmed and listing marked sold.")
+    return redirect("threads:thread_detail", thread_id=order.thread.id)
 
 
 @login_required
-def open_negotiation_conversation(request, negotiation_id):
+def open_order(request, order_id):
     """
-    Open conversation for a negotiation.
+    Open conversation for an order.
     If no thread exists yet, create it (similar to accept flow).
     """
-    negotiation = get_object_or_404(NegotiationThread, id=negotiation_id)
+    order = get_object_or_404(PurchaseOrder, id=order_id)
 
     # Verify user is either buyer or seller
-    if request.user != negotiation.buyer and request.user != negotiation.seller:
+    if request.user != order.buyer and request.user != order.seller:
         return HttpResponseForbidden()
 
     # If thread doesn't exist, create it
-    if not negotiation.thread:
+    if not order.thread:
+        # Only create the private thread if the seller has already accepted the order.
+        if order.status != OrderStatus.ACCEPTED:
+            messages.info(
+                request, "This conversation hasn't been approved by the seller yet."
+            )
+            return redirect("marketplace:listing_detail", listing_id=order.listing.id)
+
         with transaction.atomic():
             # create private thread
             thread = Thread.objects.create(
-                title=f"Marketplace: {negotiation.listing.title}",
+                title=f"Marketplace: {order.listing.title}",
                 visibility=ThreadVisibility.PRIVATE,
             )
 
             # seller participant
             ThreadParticipant.objects.create(
                 thread=thread,
-                user=negotiation.seller,
+                user=order.seller,
                 role=ThreadParticipantRole.AUTHOR,
             )
 
             # buyer participant
             ThreadParticipant.objects.create(
                 thread=thread,
-                user=negotiation.buyer,
+                user=order.buyer,
                 role=ThreadParticipantRole.MEMBER,
             )
 
-            # connect thread to negotiation
-            negotiation.thread = thread
-            if negotiation.status == NegotiationStatus.PENDING:
-                negotiation.status = NegotiationStatus.ACCEPTED
-            negotiation.save(update_fields=["thread", "status"])
+            # connect thread to order
+            order.thread = thread
+            order.save(update_fields=["thread"])
 
-    return redirect("threads:thread_detail", thread_id=negotiation.thread.id)
+    return redirect("threads:thread_detail", thread_id=order.thread.id)
 
 
 @login_required
-def reject_negotiation(request, negotiation_id):
+def reject_order(request, order_id):
 
-    negotiation = get_object_or_404(
-        NegotiationThread, id=negotiation_id, seller=request.user
-    )
+    order = get_object_or_404(PurchaseOrder, id=order_id, seller=request.user)
 
     with transaction.atomic():
-        negotiation.status = NegotiationStatus.REJECTED
-        negotiation.save(update_fields=["status"])
+        order.status = OrderStatus.REJECTED
+        order.save(update_fields=["status"])
 
-        if negotiation.thread and negotiation.thread.status != ThreadStatus.CLOSED:
-            negotiation.thread.status = ThreadStatus.CLOSED
-            negotiation.thread.save(update_fields=["status"])
+        if order.thread and order.thread.status != ThreadStatus.ARCHIVED:
+            order.thread.status = ThreadStatus.ARCHIVED
+            order.thread.save(update_fields=["status"])
+
+    try:
+        notify(
+            order.buyer,
+            "Chat request rejected by seller",
+            target=order,
+            data={
+                "order_id": order.id,
+                "listing_id": order.listing.id,
+                "url": reverse("marketplace:listing_detail", args=[order.listing.id]),
+            },
+        )
+    except Exception:
+        pass
 
     messages.success(request, "Chat request rejected.")
 
-    return redirect("marketplace:review_inquiries", listing_id=negotiation.listing.id)
+    return redirect("marketplace:review_inquiries", listing_id=order.listing.id)

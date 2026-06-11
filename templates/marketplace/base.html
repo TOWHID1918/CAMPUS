@@ -16,8 +16,8 @@
        class="{% if request.resolver_match.url_name == 'my_listings' %}active{% endif %}">
       My Listings
     </a>
-    <a href="{% url 'marketplace:negotiations_buyer' %}"
-       class="{% if request.resolver_match.url_name == 'negotiations_buyer' %}active{% endif %}">
+    <a href="{% url 'marketplace:orders_buyer' %}"
+       class="{% if request.resolver_match.url_name == 'orders_buyer' %}active{% endif %}">
       Buying
     </a>
     <div class="subnav-divider"></div>

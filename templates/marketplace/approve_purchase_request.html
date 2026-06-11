@@ -1,0 +1,46 @@
+{% extends "marketplace/base.html" %}
+{% load static %}
+
+{% block title %}Approve Order Request{% endblock %}
+
+{% block content %}
+
+<div class="campus-header">
+  <div class="campus-header__row">
+    <div>
+      <h1>Approve Order Request</h1>
+      <p>Confirm this buyer order and open a private chat to complete it.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="max-width: 700px; margin: 0 auto; padding: 24px;">
+  <div style="margin-bottom: 20px;">
+    <p class="section__label">Listing</p>
+    <h2 style="margin: 0 0 8px;">{{ listing.title }}</h2>
+    <p style="margin: 0; color: var(--text-muted);">Qty requested: <strong>{{ purchase_request.quantity }}</strong></p>
+  </div>
+
+  <div class="section" style="margin-bottom: 20px;">
+    <p class="section__label">Buyer</p>
+    <p>@{{ purchase_request.buyer.handle }}</p>
+  </div>
+
+  <div class="section" style="margin-bottom: 20px;">
+    <p class="section__label">Message</p>
+    <p style="white-space: pre-wrap;">{{ purchase_request.message|default:'No message provided.' }}</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn--primary" style="margin-right: 10px;">
+      Approve and Open Chat
+    </button>
+    <a href="{% url 'marketplace:review_orders' listing.id %}"
+       class="btn btn--outline">
+      Cancel
+    </a>
+  </form>
+</div>
+
+{% endblock %}

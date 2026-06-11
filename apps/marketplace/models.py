@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from apps.common.choices import PurchaseRequestStatus, ListingStatus, NegotiationStatus
+from apps.common.choices import ListingStatus, OrderStatus
 
 
 class Category(models.Model):
@@ -69,21 +69,21 @@ class ListingPhoto(models.Model):
         ordering = ["order"]
 
 
-class NegotiationThread(models.Model):
+class PurchaseOrder(models.Model):
     listing = models.ForeignKey(
-        Listing, on_delete=models.CASCADE, related_name="negotiation_threads"
+        Listing, on_delete=models.CASCADE, related_name="purchase_orders"
     )
 
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="buyer_negotiations",
+        related_name="buyer_orders",
     )
 
     seller = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="seller_negotiations",
+        related_name="seller_orders",
     )
 
     thread = models.OneToOneField(
@@ -91,54 +91,23 @@ class NegotiationThread(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name="marketplace_negotiation",
+        related_name="marketplace_order",
     )
 
     status = models.CharField(
         max_length=20,
-        choices=NegotiationStatus.choices,
-        default=NegotiationStatus.PENDING,
+        choices=OrderStatus.choices,
+        default=OrderStatus.PENDING,
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ("listing", "buyer")
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.buyer} → {self.listing}"
-
-
-class PurchaseRequest(models.Model):
-
-    buyer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="purchase_requests",
-    )
-
-    listing = models.ForeignKey(
-        Listing,
-        on_delete=models.CASCADE,
-        related_name="purchase_requests",
-    )
-
+    quantity = models.PositiveIntegerField(default=1)
     message = models.TextField(blank=True)
 
-    status = models.CharField(
-        max_length=20,
-        choices=PurchaseRequestStatus.choices,
-        default=PurchaseRequestStatus.PENDING,
-    )
-
     created_at = models.DateTimeField(auto_now_add=True)
 
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
-        unique_together = ("buyer", "listing")
         ordering = ["-created_at"]
+        db_table = "marketplace_negotiationthread"
 
     def __str__(self):
-        return f"{self.buyer.email} → {self.listing.title}"
+        return f"{self.buyer} → {self.listing} ({self.quantity})"

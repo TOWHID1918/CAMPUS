@@ -55,8 +55,8 @@ def thread_detail(request, thread_id):
     elif hasattr(thread, "exchange_session"):
         skill_exchange_context = getattr(thread, "exchange_session")
         base_template = "skill_exchange/base.html"
-    elif hasattr(thread, "marketplace_negotiation"):
-        marketplace_context = getattr(thread, "marketplace_negotiation")
+    elif hasattr(thread, "marketplace_order"):
+        marketplace_context = getattr(thread, "marketplace_order")
         base_template = "marketplace/base.html"
     elif hasattr(thread, "ride_group"):
         ride_group = getattr(thread, "ride_group")

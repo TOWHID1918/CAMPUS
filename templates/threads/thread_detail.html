@@ -31,7 +31,7 @@
 {% endif %}
 
 {% if marketplace_context %}
-  {% include "marketplace/_negotiation_thread_context.html" with ctx=marketplace_context %}
+  {% include "marketplace/_order_thread_context.html" with ctx=marketplace_context %}
 {% endif %}
 
 {% if ride_group_context %}
@@ -117,7 +117,7 @@
 </div>{# /message-list #}
 
 {# ── Compose ───────────────────────────────────────────────── #}
-{% if thread.status == 'open' %}
+{% if thread.status == 'active' %}
   <form class="threads-compose" method="post" enctype="multipart/form-data">
     {% csrf_token %}
 
@@ -165,7 +165,7 @@
   </form>
 {% else %}
   <div class="alert alert--warning" style="margin: 0 auto; text-align: center;">
-      <p style="margin-bottom: 10px;"><i>This thread is closed, you can no longer send messages.</i></p>
+      <p style="margin-bottom: 10px;"><i>This thread is archived, you can no longer send messages.</i></p>
   </div>
 {% endif %}
 

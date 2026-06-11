@@ -63,10 +63,10 @@
   </select>
 </div>
 
-{% if negotiations %}
+{% if orders %}
   <div class="post-grid">
-    {% for neg in negotiations %}
-      <a href="{% url 'marketplace:open_negotiation' negotiation_id=neg.id %}"
+    {% for neg in orders %}
+      <a href="{% url 'marketplace:open_order' order_id=neg.id %}"
          class="post-card">
 
         <div class="post-card__cover">
@@ -121,6 +121,16 @@
               @{{ neg.listing.seller.handle }}
             </div>
             <div class="post-card__meta-item">
+              Qty: {{ neg.quantity }}
+            </div>
+            <div class="post-card__meta-item">
+              {% if neg.listing.stock and neg.listing.stock > 0 %}
+                Stock: {{ neg.listing.stock }}
+              {% else %}
+                Out of stock
+              {% endif %}
+            </div>
+            <div class="post-card__meta-item">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                    stroke="currentColor" stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
@@ -166,7 +176,8 @@
 {% block extra_js %}
 <script src="{% static 'marketplace/js/marketplace.js' %}"></script>
 <script>
-  const negotiationsBuyerUrl = '{% url "marketplace:negotiations_buyer" %}';
-  initNegotiationsBuyer();
+  const ordersBuyerUrl = '{% url "marketplace:orders_buyer" %}';
+  const ordersBuyerUrl = ordersBuyerUrl; // backwards compatible alias for JS
+  initOrdersBuyer();
 </script>
 {% endblock %}

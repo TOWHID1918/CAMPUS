@@ -46,15 +46,15 @@ function initMyListings() {
   if (count) count.textContent = cards.length + ' listing' + (cards.length !== 1 ? 's' : '');
 }
 
-/* ── Negotiations Buyer ───────────────────────────────────── */
-function initNegotiationsBuyer() {
-  document.getElementById('categoryFilter').addEventListener('change', applyNegotiationFilters);
-  document.getElementById('sortFilter').addEventListener('change', applyNegotiationFilters);
+/* ── Orders Buyer ───────────────────────────────────── */
+function initOrdersBuyer() {
+  document.getElementById('categoryFilter').addEventListener('change', applyOrderFilters);
+  document.getElementById('sortFilter').addEventListener('change', applyOrderFilters);
   document.getElementById('searchInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') applyNegotiationFilters();
+    if (e.key === 'Enter') applyOrderFilters();
   });
 
-  function applyNegotiationFilters() {
+  function applyOrderFilters() {
     const category = document.getElementById('categoryFilter').value;
     const sort     = document.getElementById('sortFilter').value;
     const search   = document.getElementById('searchInput').value.trim();
@@ -62,7 +62,7 @@ function initNegotiationsBuyer() {
     if (category) params.set('category', category);
     if (sort !== 'newest') params.set('sort', sort);
     if (search) params.set('search', search);
-    window.location.href = negotiationsBuyerUrl + '?' + params.toString();
+    window.location.href = ordersBuyerUrl + '?' + params.toString();
   }
 
   const cards = document.querySelectorAll('.post-card');

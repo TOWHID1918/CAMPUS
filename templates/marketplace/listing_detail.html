@@ -33,39 +33,38 @@
     {% endif %}
 
     {% if user.is_authenticated and user != listing.seller and listing.status == "active" %}
-
-      {% if negotiation %}
-
-        {% if negotiation.status == "pending" %}
-
-          <button class="btn btn--outline btn--sm" disabled>
-            Request Pending
-          </button>
-
-        {% elif negotiation.status == "accepted" %}
-
-          <a href="{% url 'threads:thread_detail' negotiation.thread.id %}"
+      <div style="display:flex; flex-wrap:wrap; gap: 10px; align-items:center;">
+        {% if active_order and active_order.thread %}
+          <a href="{% url 'threads:thread_detail' thread_id=active_order.thread.id %}"
              class="btn btn--primary btn--sm">
-            Open Chat
+            Open Order Chat
           </a>
-
-        {% elif negotiation.status == "rejected" %}
-
+        {% elif pending_request %}
           <button class="btn btn--outline btn--sm" disabled>
-            Request Rejected
+            Order request pending ({{ pending_request.quantity }})
           </button>
-
+        {% elif listing.stock == 0 %}
+          <button class="btn btn--outline btn--sm" disabled>
+            Out of stock
+          </button>
+        {% else %}
+          <form action="{% url 'marketplace:request_chat' listing.id %}"
+                method="post"
+                style="display:flex; flex-wrap:wrap; gap: 10px; align-items:center;">
+            {% csrf_token %}
+            <input type="number"
+                   name="quantity"
+                   value="1"
+                   min="1"
+                   max="{{ listing.stock }}"
+                   style="width: 94px; padding: 8px 10px; border-radius: var(--radius); border: 1.5px solid var(--border-dark); background: var(--surface); color: var(--text); font-size: 13px;"
+                   required />
+            <button type="submit" class="btn btn--primary btn--sm">
+              Request Order
+            </button>
+          </form>
         {% endif %}
-
-      {% else %}
-
-        <a href="{% url 'marketplace:request_chat' listing.id %}"
-           class="btn btn--primary btn--sm">
-          Request Chat
-        </a>
-
-      {% endif %}
-
+      </div>
     {% endif %}
 
   </div>
@@ -73,39 +72,36 @@
 
 {% if user == listing.seller %}
 
-  {% with listing.negotiation_threads.all as inquiries %}
+  {% if pending_orders_count > 0 %}
 
-    {% if inquiries %}
+    <div style="
+      margin-bottom: 20px;
+      padding: 14px 18px;
+      background: var(--orange-light);
+      border: 1px solid var(--orange-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    ">
 
-      <div style="
-        margin-bottom: 20px;
-        padding: 14px 18px;
-        background: var(--orange-light);
-        border: 1px solid var(--orange-border);
-        border-radius: var(--radius-md);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      ">
+      <span style="font-size: 14px; color: var(--text);">
+        You have
+        <strong>{{ pending_orders_count }}</strong>
+        order request{{ pending_orders_count|pluralize }}.
+      </span>
 
-        <span style="font-size: 14px; color: var(--text);">
-          You have
-          <strong>{{ inquiries.count }}</strong>
-          chat request{{ inquiries.count|pluralize }}.
-        </span>
+      <a href="{% url 'marketplace:review_orders' listing.id %}"
+         class="btn btn--primary btn--sm">
+        Review Orders
+      </a>
 
-        <a href="{% url 'marketplace:review_inquiries' listing.id %}"
-           class="btn btn--primary btn--sm">
-          Review Requests
-        </a>
+    </div>
 
-      </div>
-
-    {% endif %}
-
-  {% endwith %}
+  {% endif %}
 
 {% endif %}
+{% comment %} Orders are managed from the unified Orders page. {% endcomment %}
 
 <div class="detail-grid">
 
@@ -232,6 +228,18 @@
 
           <dd>
             {{ listing.created_at|date:"M d, Y" }}
+          </dd>
+        </div>
+
+        <div class="detail-meta-row">
+          <dt>Stock</dt>
+
+          <dd>
+            {% if listing.stock and listing.stock > 0 %}
+              {{ listing.stock }} available
+            {% else %}
+              Out of stock
+            {% endif %}
           </dd>
         </div>
 

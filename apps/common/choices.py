@@ -141,9 +141,11 @@ class ListingStatus(models.TextChoices):
     ARCHIVED = "archived", "Archived"
 
 
-class PurchaseRequestStatus(models.TextChoices):
+class OrderStatus(models.TextChoices):
     PENDING = "pending", "Pending"
     ACCEPTED = "accepted", "Accepted"
+    COMPLETED = "completed", "Completed"
+    RECEIVED = "received", "Received"
     REJECTED = "rejected", "Rejected"
 
 

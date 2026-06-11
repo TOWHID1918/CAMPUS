@@ -66,10 +66,10 @@
 {% if listings %}
   <div class="post-grid">
     {% for listing in listings %}
-      <a href="{% url 'marketplace:listing_detail' listing.id %}"
-         class="post-card">
+      <div class="post-card">
 
         <div class="post-card__cover">
+          <a href="{% url 'marketplace:listing_detail' listing.id %}">
           {% with listing.photos.first as cover %}
             {% if cover %}
               <img src="{{ cover.photo.file.url }}" alt="{{ listing.title }}" loading="lazy" />
@@ -86,6 +86,7 @@
               </div>
             {% endif %}
           {% endwith %}
+          </a>
 
           <div class="post-card__badge">
             <span class="badge badge--active"
@@ -131,17 +132,31 @@
               </svg>
               {{ listing.created_at|date:"M j, Y" }}
             </div>
+            <div class="post-card__meta-item">
+              {% if listing.stock and listing.stock > 0 %}
+                Stock: {{ listing.stock }}
+              {% else %}
+                Out of stock
+              {% endif %}
+            </div>
           </div>
 
-          <div class="post-card__footer">
-            <span class="btn btn--ghost btn--sm"
-                  style="width: 100%; justify-content: center;">
+          <div class="post-card__footer" style="display:flex; gap:8px; flex-direction:column;">
+            <a href="{% url 'marketplace:listing_detail' listing.id %}"
+               class="btn btn--ghost btn--sm"
+               style="width: 100%; justify-content: center;">
               View Details
-            </span>
+            </a>
+
+            <a href="{% url 'marketplace:review_orders' listing.id %}"
+               class="btn btn--primary btn--sm"
+               style="width: 100%; justify-content: center;">
+              Review Orders{% if listing.pending_orders_count|default:0 > 0 %} ({{ listing.pending_orders_count }}){% endif %}
+            </a>
           </div>
         </div>
 
-      </a>
+      </div>
     {% endfor %}
   </div>
 

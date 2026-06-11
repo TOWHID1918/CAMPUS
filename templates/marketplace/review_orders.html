@@ -1,0 +1,99 @@
+{% extends "marketplace/base.html" %}
+{% load static %}
+
+{% block title %}Orders — Marketplace{% endblock %}
+
+{% block content %}
+
+<div class="campus-header">
+  <div class="campus-header__row">
+    <div>
+      <h1>Orders</h1>
+      <p>Manage buyer orders and inquiries for this listing; approve, reject, or open chats.</p>
+    </div>
+
+    <a href="{% url 'marketplace:listing_detail' listing.id %}"
+       class="btn btn--ghost btn--sm">
+      Back to Listing
+    </a>
+  </div>
+</div>
+
+<div class="lf-filter-bar" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px;">
+  <form method="get" style="display:flex; flex-wrap: wrap; gap: 8px; align-items:center;">
+    <input
+      type="text"
+      name="search"
+      placeholder="Search buyers..."
+      value="{{ current_search }}"
+      style="padding: 5px 10px; border-radius: var(--radius); border: 1.5px solid var(--border-dark); background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit; min-width: 220px;" />
+    <select name="sort" style="padding: 5px 10px; border-radius: var(--radius); border: 1.5px solid var(--border-dark); background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;">
+      <option value="first" {% if current_sort == "first" %}selected{% endif %}>First Received</option>
+      <option value="latest" {% if current_sort == "latest" %}selected{% endif %}>Newest</option>
+      <option value="quantity_low" {% if current_sort == "quantity_low" %}selected{% endif %}>Quantity Low</option>
+      <option value="quantity_high" {% if current_sort == "quantity_high" %}selected{% endif %}>Quantity High</option>
+    </select>
+    <button type="submit" class="btn btn--outline btn--sm">Apply</button>
+  </form>
+</div>
+
+<!-- Orders section -->
+<h2 style="margin-top: 8px;">Order Requests</h2>
+{% if requests %}
+  <div class="post-grid">
+    {% for req in requests %}
+      <div class="post-card">
+        <div class="post-card__body">
+          <div class="post-card__title">@{{ req.buyer.handle }}</div>
+          <div class="post-card__meta">
+            <div class="post-card__meta-item">Qty: {{ req.quantity }}</div>
+            <div class="post-card__meta-item">{{ req.created_at|date:"M j, Y" }}</div>
+            <div class="post-card__meta-item">{{ req.get_status_display }}</div>
+          </div>
+
+          {% if req.message %}
+            <div style="margin-top: 10px; color: var(--text-muted); font-size: 14px;">
+              {{ req.message|linebreaksbr }}
+            </div>
+          {% else %}
+            <div style="margin-top: 10px; color: var(--text-muted); font-size: 14px;">
+              No message provided.
+            </div>
+          {% endif %}
+
+          <div class="post-card__footer" style="margin-top: 16px; display:flex; gap: 10px; flex-wrap: wrap;">
+            {% if req.status == "pending" %}
+              <a href="{% url 'marketplace:approve_purchase_request' listing.id req.id %}"
+                 class="btn btn--primary btn--sm">
+                Approve
+              </a>
+
+              <form action="{% url 'marketplace:reject_purchase_request' listing.id req.id %}"
+                    method="post" style="display:inline; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--outline btn--sm">
+                  Reject
+                </button>
+              </form>
+            {% else %}
+              {% if req.thread %}
+                <a href="{% url 'threads:thread_detail' thread_id=req.thread.id %}"
+                   class="btn btn--primary btn--sm">Open Chat</a>
+               {% else %}
+               <a href="{% url 'marketplace:open_order' order_id=req.id %}"
+                 class="btn btn--outline btn--sm">Open Chat</a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty">
+    <strong>No order requests yet.</strong>
+    <p>Buyers will appear here once they request a quantity.</p>
+  </div>
+{% endif %}
+
+{% endblock %}
