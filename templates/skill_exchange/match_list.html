@@ -30,7 +30,16 @@
                             <div class="sx-trade-arrow">⇄</div>
                             
                             <div class="sx-trade-party sx-trade-party--right">
-                                <div class="sx-user-label"><a href="{% url 'accounts:profile' handle=match.user_context.partner_user.handle %}">@{{ match.user_context.partner_user.handle }}</a> offers</div>
+                                <div class="sx-user-label">
+                                    <a href="{% url 'accounts:profile' handle=match.user_context.partner_user.handle %}">@{{ match.user_context.partner_user.handle }}</a>
+                                    <span class="sx-partner-rating">(
+                                        {% if match.partner_sx_rating and match.partner_sx_rating > 0 %}
+                                            {{ match.partner_sx_rating|floatformat:1 }}★
+                                        {% else %}
+                                            No rating
+                                        {% endif %}
+                                    ) offers</span>
+                                </div>
                                 <div class="sx-user-name">{{ match.user_context.partner_skill.name }}</div>
                             </div>
                         </div>

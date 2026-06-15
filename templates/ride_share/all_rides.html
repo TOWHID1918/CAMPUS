@@ -78,8 +78,8 @@
                     </div>
                   {% endif %}
                   <div>
-                    <strong>{{ post.user.profile.handle }}</strong>
-                    <small style="display: block; color: var(--text-muted);">{{ post.created_at|date:"M d, Y g:i A" }}</small>
+                    <strong>{{ post.user.profile.handle|default:post.user.get_full_name|default:post.user.email }}</strong>
+                    <small style="display: block; color: var(--text-muted);">Posted {{ post.created_at|date:"M d, Y g:i A" }}</small>
                   </div>
                 </div>
                 <span class="badge {% if post.status == 'open' %}badge--active{% else %}badge--muted{% endif %}">

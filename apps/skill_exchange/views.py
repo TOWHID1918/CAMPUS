@@ -77,6 +77,11 @@ def match_list(request):
 
     for match in pending_matches:
         match.user_context = match.get_context_for_user(request.user)
+        # Expose partner's skill-exchange rating for the template
+        partner = match.user_context.get("partner_user")
+        match.partner_sx_rating = getattr(
+            getattr(partner, "profile", None), "sx_rating_avg", 0.0
+        )
 
     return render(
         request,
@@ -94,6 +99,11 @@ def session_list(request):
 
     for session in active_sessions:
         session.user_context = session.match.get_context_for_user(request.user)
+        # Expose partner's skill-exchange rating for the template
+        partner = session.user_context.get("partner_user")
+        session.partner_sx_rating = getattr(
+            getattr(partner, "profile", None), "sx_rating_avg", 0.0
+        )
 
     return render(
         request,

@@ -26,6 +26,12 @@
                             </h3>
                             <p style="font-size: 13px; color: var(--text-muted);">
                                 Session active since {{ session.started_at|date:"M d" }}
+                                &middot;
+                                {% if session.partner_sx_rating and session.partner_sx_rating > 0 %}
+                                    Partner rating: {{ session.partner_sx_rating|floatformat:1 }}★
+                                {% else %}
+                                    Partner rating: No rating
+                                {% endif %}
                             </p>
                         </div>
                         <a href="{% url 'threads:thread_detail' thread_id=session.thread.id %}" class="btn btn--outline btn--sm">
